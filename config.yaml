@@ -1,0 +1,82 @@
+# ============================================================
+# hydrogen-electricity-network — System Configuration
+# ============================================================
+# All physical, economic, and simulation parameters live here.
+# No hardcoded constants in source files — always reference config.
+# ============================================================
+
+# --- Simulation settings ------------------------------------
+simulation:
+  time_horizon_hours: 168        # 1 week (7 days x 24h) for initial runs
+  time_step_hours: 1             # Hourly resolution
+  start_date: "2023-01-01"       # ISO format
+  timezone: "Europe/Amsterdam"   # TNO is Netherlands-based
+
+# --- Geographic location ------------------------------------
+# Used for ERA5 data fetching and solar/wind resource estimation
+location:
+  name: "North Sea / Netherlands"
+  latitude: 52.5                 # Approx. offshore North Sea
+  longitude: 3.5
+  era5_grid_resolution: 0.25    # degrees (ERA5 native resolution)
+
+# --- Electrolyzer (PEM) -------------------------------------
+# Source: IRENA 2020 / Nel Hydrogen datasheet references
+electrolyzer:
+  rated_power_mw: 100.0          # Nameplate electrical input
+  min_load_fraction: 0.10        # Minimum stable operating point (10%)
+  max_load_fraction: 1.00        # Maximum load (100%)
+  nominal_efficiency: 0.70       # kWh_H2 / kWh_elec at nominal load (LHV basis)
+  startup_time_minutes: 5        # Cold start ramp time (PEM advantage)
+  ramp_rate_per_hour: 0.40   # 40% of rated per hour — for hourly dispatch
+  hydrogen_output_pressure_bar: 30.0   # Outlet pressure
+  degradation_rate_per_year: 0.005     # 0.5% efficiency loss per year
+
+# --- Wind turbine -------------------------------------------
+# Generic offshore wind turbine (representative of North Sea assets)
+wind_turbine:
+  rated_power_mw: 15.0           # Single turbine (e.g. Vestas V236 class)
+  n_turbines: 10                 # Farm: 150 MW total
+  hub_height_m: 120.0
+  cut_in_wind_speed_ms: 3.0      # Below this: zero output
+  rated_wind_speed_ms: 13.0      # Full power above this
+  cut_out_wind_speed_ms: 25.0    # Safety shutdown above this
+  power_curve_model: "cubic"     # P ~ v^3 between cut-in and rated
+
+# --- Hydrogen pipeline ---------------------------------------
+# Simplified single pipeline from electrolyzer to demand node
+pipeline:
+  length_km: 50.0
+  diameter_m: 0.5
+  roughness_mm: 0.046            # Steel pipe (Moody chart standard)
+  inlet_pressure_bar: 30.0       # Matches electrolyzer outlet
+  min_outlet_pressure_bar: 20.0  # Minimum delivery pressure
+  max_flow_kg_per_s: 2.0         # Physical capacity constraint
+
+# --- Hydrogen demand ----------------------------------------
+hydrogen_demand:
+  daily_average_kg: 50000        # ~50 tonnes/day industrial demand
+  demand_profile: "flat"         # Options: flat, industrial_pattern
+
+# --- Electricity network ------------------------------------
+electricity_network:
+  n_buses: 5
+  base_voltage_kv: 110.0         # Transmission level
+  base_mva: 100.0
+  load_profile: "entso_e"        # Use real ENTSO-E data
+
+# --- Economics ----------------------------------------------
+economics:
+  electricity_price_source: "entso_e"   # Real day-ahead prices
+  currency: "EUR"
+  electrolyzer_capex_per_kw: 800        # EUR/kW (2023 estimate)
+  electrolyzer_opex_fraction: 0.02      # 2% of CAPEX per year
+  wind_capex_per_kw: 2500               # EUR/kW offshore
+  hydrogen_value_per_kg: 4.0            # EUR/kg green hydrogen
+
+# --- Optimization -------------------------------------------
+optimization:
+  objective: "minimize_cost"     # Options: minimize_cost, minimize_emissions
+  solver: "highs"                # Free solver — no license needed
+  time_limit_seconds: 300
+  mip_gap: 0.01                  # 1% optimality gap acceptable

@@ -1,0 +1,29 @@
+# Core scientific stack
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+matplotlib>=3.7
+seaborn>=0.12
+
+# Electricity network modelling
+pandapower>=2.13
+pandapipes>=0.9
+
+# Optimization
+pyomo>=6.6
+highspy>=1.5          # Free open-source MILP solver (no license needed)
+
+# Data sources
+entsoe-py>=0.6        # ENTSO-E Transparency Platform API wrapper
+cdsapi>=0.6           # ERA5 climate data (Copernicus)
+xarray>=2023.1        # ERA5 NetCDF handling
+cfgrib>=0.9           # GRIB file support for ERA5
+
+# Utilities
+pyyaml>=6.0           # config.yaml parsing
+jupyter>=1.0
+ipykernel>=6.0
+tqdm>=4.65            # Progress bars for long data fetches
+
+# Testing
+pytest>=7.4
