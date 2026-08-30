@@ -16,10 +16,18 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
-python -m optimization.dispatch
+pynexus solve --config configs/tiny_test.yaml --synthetic --output outputs/tiny
+pynexus verify --run outputs/tiny
 ```
 
-The module demonstration runs deterministic 48-hour cases and opens plots. For automated verification, use the test suite, which includes hand-checkable dispatch constraints without interactive plotting.
+For the 168-hour reference, replace the config with `config.yaml` and use a fresh
+output directory. `--synthetic` is explicit: no ENTSO-E/ERA5 data are downloaded.
+Alternatively supply `--input inputs.csv`; see [input schema](docs/input_schema.md).
+The legacy `python -m optimization.dispatch` demonstration remains interactive.
+
+The runner saves the exact config, inputs, dispatch, hashes, environment, solver
+settings/status, model size and independent numerical checks. It rejects an
+existing output directory to prevent stale results after a failed solve.
 
 ## Configuration
 
@@ -32,6 +40,7 @@ The module demonstration runs deterministic 48-hour cases and opens plots. For a
 - `docs/data_provenance.md` — source/configuration boundary
 - `docs/verification.md` — deterministic test evidence and validation terminology
 - `tests/` — fast component and optimisation tests
+- [Reproducibility and change evidence](docs/reproducibility.md)
 
 ## Contributing
 

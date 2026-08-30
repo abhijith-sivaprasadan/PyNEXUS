@@ -39,6 +39,7 @@
 # ============================================================
 
 import sys
+import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -123,11 +124,18 @@ class ElectrolyzerDispatchOptimizer:
 
         s = cfg["simulation"]
         self.dt = s["time_step_hours"]
+        if not np.isfinite(self.dt) or self.dt <= 0:
+            raise ValueError("time_step_hours must be finite and positive")
+        self.max_ramp_mw *= self.dt
 
         o = cfg["optimization"]
         self.solver_name = o.get("solver", "highs")
         self.time_limit = o.get("time_limit_seconds", 300)
         self.mip_gap = o.get("mip_gap", 0.01)
+        self.threads = o.get("threads", 1)
+        self.random_seed = o.get("random_seed", 0)
+        if self.solver_name not in {"highs", "appsi_highs"}:
+            raise ValueError("Only the HiGHS solver is supported")
 
         self.DEMAND_PENALTY = 1000.0  # EUR per kg unmet H2
 
@@ -162,10 +170,27 @@ class ElectrolyzerDispatchOptimizer:
         if not PYOMO_AVAILABLE:
             raise RuntimeError("Pyomo not installed. pip install pyomo highspy")
 
-        wind_power_mw = np.asarray(wind_power_mw, dtype=float)
-        electricity_prices = np.asarray(electricity_prices, dtype=float)
+        def vector(values, name):
+            array = np.asarray(values, dtype=float)
+            if array.ndim != 1 or not len(array) or not np.isfinite(array).all():
+                raise ValueError(f"{name} must be a non-empty finite 1-D array")
+            return array
+
+        wind_power_mw = vector(wind_power_mw, "wind_power_mw")
+        electricity_prices = vector(electricity_prices, "electricity_prices")
         T = len(wind_power_mw)
-        assert len(electricity_prices) == T, "Arrays must match length"
+        if len(electricity_prices) != T:
+            raise ValueError("Arrays must match length")
+        if (wind_power_mw < 0).any():
+            raise ValueError("wind_power_mw must be non-negative")
+        if demand_mode not in {"hourly", "cumulative"}:
+            raise ValueError(f"Unknown demand_mode: {demand_mode}")
+        if objective == "minimize_emissions" and carbon_intensity is None:
+            raise ValueError("carbon_intensity required")
+        if carbon_intensity is not None:
+            carbon_intensity = vector(carbon_intensity, "carbon_intensity")
+            if len(carbon_intensity) != T or (carbon_intensity < 0).any():
+                raise ValueError("carbon_intensity must match horizon and be non-negative")
 
         model = pyo.ConcreteModel(name="ElectrolyzerDispatch")
         model.T = pyo.RangeSet(0, T - 1)
@@ -229,7 +254,7 @@ class ElectrolyzerDispatchOptimizer:
 
             model.c_demand = pyo.Constraint(model.T, rule=h2_demand_hourly)
         elif demand_mode == "cumulative":
-            total_demand = self.hourly_demand_kg * T
+            total_demand = self.hourly_demand_kg * T * self.dt
 
             def h2_demand_cumul(model):
                 return sum(model.p[t] * self.h2_coeff * self.dt for t in model.T) >= total_demand
@@ -241,7 +266,7 @@ class ElectrolyzerDispatchOptimizer:
 
             def cost_obj(model):
                 return sum(model.price[t] * model.p[t] * self.dt for t in model.T) + sum(
-                    self.DEMAND_PENALTY * model.demand_slack[t] for t in model.T
+                    self.DEMAND_PENALTY * model.demand_slack[t] * self.dt for t in model.T
                 )
 
             model.objective = pyo.Objective(rule=cost_obj, sense=pyo.minimize)
@@ -255,7 +280,7 @@ class ElectrolyzerDispatchOptimizer:
 
             def emissions_obj(model):
                 return sum(model.carbon[t] * model.p[t] * self.dt for t in model.T) + sum(
-                    self.DEMAND_PENALTY * model.demand_slack[t] for t in model.T
+                    self.DEMAND_PENALTY * model.demand_slack[t] * self.dt for t in model.T
                 )
 
             model.objective = pyo.Objective(rule=emissions_obj, sense=pyo.minimize)
@@ -266,32 +291,33 @@ class ElectrolyzerDispatchOptimizer:
         solver = SolverFactory("appsi_highs")
         solver.options["time_limit"] = self.time_limit
         solver.options["mip_rel_gap"] = self.mip_gap
-
-        try:
-            sol = solver.solve(model, tee=False)
-        except RuntimeError as exc:
-            if "feasible solution was not found" not in str(exc).lower():
-                raise
-            return {
-                "status": "infeasible",
-                "objective_value": None,
-                "power_schedule": None,
-                "online_status": None,
-                "h2_produced_kg_h": None,
-                "cost_profile": None,
-                "slack_values": None,
-                "results_df": None,
-            }
+        solver.options["threads"] = self.threads
+        solver.options["random_seed"] = self.random_seed
+        started = time.perf_counter()
+        sol = solver.solve(model, tee=False, load_solutions=False)
         status = str(sol.solver.termination_condition)
+        metadata = {
+            "solver_status": str(sol.solver.status),
+            "termination_condition": status,
+            "solve_wall_time_s": time.perf_counter() - started,
+            "variables": sum(1 for _ in model.component_data_objects(pyo.Var)),
+            "binary_variables": sum(v.is_binary() for v in model.component_data_objects(pyo.Var)),
+            "constraints": sum(
+                1 for _ in model.component_data_objects(pyo.Constraint, active=True)
+            ),
+        }
 
-        if "optimal" not in status.lower() and "feasible" not in status.lower():
-            print(f"WARNING: Solver status = {status}")
+        # Exact enum matching: 'infeasible' contains 'feasible' as a substring.
+        # Time-limit/unknown runs are not published as verified dispatch results.
+        if sol.solver.termination_condition != pyo.TerminationCondition.optimal:
             return {
+                **metadata,
                 "status": status,
                 "objective_value": None,
                 "power_schedule": None,
                 "results_df": None,
             }
+        model.solutions.load_from(sol)
 
         # Extract solution
         power_schedule = np.array([pyo.value(model.p[t]) for t in range(T)])
@@ -306,6 +332,7 @@ class ElectrolyzerDispatchOptimizer:
             {
                 "timestep": np.arange(T),
                 "wind_available_mw": wind_power_mw,
+                "curtailment_mw": wind_power_mw - power_schedule,
                 "power_optimized_mw": power_schedule,
                 "online_status": online_status.astype(int),
                 "electricity_price": electricity_prices,
@@ -318,6 +345,7 @@ class ElectrolyzerDispatchOptimizer:
         )
 
         return {
+            **metadata,
             "status": status,
             "objective_value": pyo.value(model.objective),
             "power_schedule": power_schedule,
@@ -335,20 +363,24 @@ class ElectrolyzerDispatchOptimizer:
             return
 
         df = result["results_df"]
-        total_slack = df["demand_slack_kg_h"].sum()
+        total_slack = df["demand_slack_kg_h"].sum() * self.dt
 
         print("\n" + "=" * 55)
         print("OPTIMIZATION RESULT SUMMARY")
         print("=" * 55)
         print(f"  Solver status:           {result['status']}")
         print(f"  Objective value:         {result['objective_value']:.2f}")
-        print(f"  Hours optimized:         {len(df)}")
+        print(f"  Hours optimized:         {len(df) * self.dt:g}")
         print(f"  Avg power dispatch:      {df['power_optimized_mw'].mean():.1f} MW")
-        print(f"  Electrolyzer online:     {df['online_status'].sum()}/{len(df)} hours")
-        print(f"  Total H2 produced:       {df['h2_produced_kg_h'].sum() / 1000:.2f} tonnes")
-        print(f"  Total H2 demand:         {df['h2_demand_kg_h'].sum() / 1000:.2f} tonnes")
+        print(f"  Electrolyzer online:     {df['online_status'].sum()}/{len(df)} intervals")
+        print(
+            f"  Total H2 produced:       {df['h2_produced_kg_h'].sum() * self.dt / 1000:.2f} tonnes"
+        )
+        print(
+            f"  Total H2 demand:         {df['h2_demand_kg_h'].sum() * self.dt / 1000:.2f} tonnes"
+        )
         print(f"  Unmet demand (slack):    {total_slack:.0f} kg total")
-        print(f"  Hours demand fully met:  {df['demand_met'].sum()}/{len(df)}")
+        print(f"  Intervals demand met:    {df['demand_met'].sum()}/{len(df)}")
         print(f"  Total electricity cost:  EUR {df['cost_eur'].sum():.0f}")
         print(f"  Avg electricity price:   EUR {df['electricity_price'].mean():.1f}/MWh")
         print("=" * 55)
@@ -402,18 +434,18 @@ class ElectrolyzerDispatchOptimizer:
                 "Cost-optimal": [
                     f"{cost_of_cost_opt:.0f}",
                     f"{emis_of_cost_opt:.0f}",
-                    f"{df_c['h2_produced_kg_h'].sum():.0f}",
+                    f"{df_c['h2_produced_kg_h'].sum() * self.dt:.0f}",
                     f"{df_c['power_optimized_mw'].mean():.1f}",
-                    f"{(df_c['power_optimized_mw'] >= self.p_max * 0.99).sum()}",
-                    f"{(df_c['online_status'] == 0).sum()}",
+                    f"{(df_c['power_optimized_mw'] >= self.p_max * 0.99).sum() * self.dt:g}",
+                    f"{(df_c['online_status'] == 0).sum() * self.dt:g}",
                 ],
                 "Emissions-optimal": [
                     f"{cost_of_emis_opt:.0f}",
                     f"{emis_of_emis_opt:.0f}",
-                    f"{df_e['h2_produced_kg_h'].sum():.0f}",
+                    f"{df_e['h2_produced_kg_h'].sum() * self.dt:.0f}",
                     f"{df_e['power_optimized_mw'].mean():.1f}",
-                    f"{(df_e['power_optimized_mw'] >= self.p_max * 0.99).sum()}",
-                    f"{(df_e['online_status'] == 0).sum()}",
+                    f"{(df_e['power_optimized_mw'] >= self.p_max * 0.99).sum() * self.dt:g}",
+                    f"{(df_e['online_status'] == 0).sum() * self.dt:g}",
                 ],
             }
         )
@@ -491,7 +523,7 @@ def plot_optimization_result(
     ax3c.step(
         hours, df["power_optimized_mw"], color="#2196F3", linewidth=1.5, where="post", alpha=0.8
     )
-    ax3.set_xlabel("Hour")
+    ax3.set_xlabel("Interval index")
     ax3.set_ylabel("Price (EUR/MWh)", color="#FF9800")
     ax3c.set_ylabel("Power dispatch (MW)", color="#2196F3")
     ax3.set_title("Price Signal vs Dispatch")
@@ -556,7 +588,7 @@ if __name__ == "__main__":
     print("\nOptimizer parameters:")
     print(f"  Electrolyzer rated:    {opt.p_rated} MW")
     print(f"  Min load:              {opt.p_min} MW")
-    print(f"  Max ramp/hour:         {opt.max_ramp_mw} MW/h")
+    print(f"  Max ramp/interval:     {opt.max_ramp_mw} MW per interval")
     print(f"  H2 coefficient:        {opt.h2_coeff:.2f} kg/MWh")
     print(f"  Hourly H2 demand:      {opt.hourly_demand_kg:.0f} kg/h")
     print(f"  Demand penalty:        EUR {opt.DEMAND_PENALTY}/kg unmet")
