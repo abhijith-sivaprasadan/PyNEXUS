@@ -45,20 +45,21 @@
 #      Together these reveal the system bottleneck.
 # ============================================================
 
+# Import Layer 1 components
+import sys
+from pathlib import Path
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from pathlib import Path
 
-# Import Layer 1 components
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from components.electrolyzer import PEMElectrolyzer
-from components.wind_turbine  import OffshoreWindFarm
-from components.pipeline      import HydrogenPipeline
+from components.pipeline import HydrogenPipeline
+from components.wind_turbine import OffshoreWindFarm
 
 
 # --- Load config --------------------------------------------
@@ -70,6 +71,7 @@ def _load_config(config_path: str = "config.yaml") -> dict:
 
 
 # --- Core class ---------------------------------------------
+
 
 class GreenHydrogenAsset:
     """
@@ -95,18 +97,18 @@ class GreenHydrogenAsset:
         cfg = _load_config(config_path)
 
         # Instantiate Layer 1 components
-        self.wind_farm    = OffshoreWindFarm(config_path)
+        self.wind_farm = OffshoreWindFarm(config_path)
         self.electrolyzer = PEMElectrolyzer(config_path)
-        self.pipeline     = HydrogenPipeline(config_path)
+        self.pipeline = HydrogenPipeline(config_path)
 
         # Demand parameters
         d = cfg["hydrogen_demand"]
-        self.daily_demand_kg        = d["daily_average_kg"]
-        self.hourly_demand_kg       = self.daily_demand_kg / 24.0
+        self.daily_demand_kg = d["daily_average_kg"]
+        self.hourly_demand_kg = self.daily_demand_kg / 24.0
 
         # Simulation parameters
         s = cfg["simulation"]
-        self.timestep_hours         = s["time_step_hours"]
+        self.timestep_hours = s["time_step_hours"]
 
     # --- Core simulation ------------------------------------
 
@@ -133,8 +135,8 @@ class GreenHydrogenAsset:
             and curtailment/loss breakdown
         """
         wind_speed_10m = np.asarray(wind_speed_10m, dtype=float)
-        n              = len(wind_speed_10m)
-        dt             = self.timestep_hours
+        n = len(wind_speed_10m)
+        dt = self.timestep_hours
 
         # --- Step 1: Wind farm power output -----------------
         wind_power_mw = self.wind_farm.power_output_mw(wind_speed_10m)
@@ -144,21 +146,19 @@ class GreenHydrogenAsset:
         # Excess is curtailed (spilled) — in a real system it
         # would go to the grid, but in this islanded model it
         # is lost. Layer 3 will add grid export.
-        elec_rated     = self.electrolyzer.rated_power_mw
-        power_to_elec  = np.minimum(wind_power_mw, elec_rated)
-        wind_curtailed = wind_power_mw - power_to_elec   # MW curtailed
+        elec_rated = self.electrolyzer.rated_power_mw
+        power_to_elec = np.minimum(wind_power_mw, elec_rated)
+        wind_curtailed = wind_power_mw - power_to_elec  # MW curtailed
 
         # --- Step 3: Electrolyzer simulation ----------------
         # This applies ramp rate constraints internally.
         # Returns actual power consumed + H2 output per timestep.
-        elec_result = self.electrolyzer.simulate_timeseries(
-            power_to_elec, timestep_hours=dt
-        )
+        elec_result = self.electrolyzer.simulate_timeseries(power_to_elec, timestep_hours=dt)
 
         actual_power_mw = elec_result["power_input_mw"].values
-        h2_requested    = elec_result["h2_output_kg_s"].values   # kg/s
-        efficiency      = elec_result["efficiency"].values
-        load_fraction   = elec_result["load_fraction"].values
+        h2_requested = elec_result["h2_output_kg_s"].values  # kg/s
+        efficiency = elec_result["efficiency"].values
+        load_fraction = elec_result["load_fraction"].values
 
         # Ramp curtailment: difference between what wind offered
         # and what the electrolyzer could actually consume
@@ -167,61 +167,59 @@ class GreenHydrogenAsset:
         # --- Step 4: Pipeline constraint --------------------
         # Pipeline may not be able to accept all H2 produced.
         # constrained_flow() returns max feasible flow.
-        h2_delivered = np.array([
-            self.pipeline.constrained_flow(q) for q in h2_requested
-        ])
-        pipeline_curtailed = h2_requested - h2_delivered   # kg/s
+        h2_delivered = np.array([self.pipeline.constrained_flow(q) for q in h2_requested])
+        pipeline_curtailed = h2_requested - h2_delivered  # kg/s
 
-        outlet_pressure = np.array([
-            self.pipeline.outlet_pressure(q) for q in h2_delivered
-        ])
+        outlet_pressure = np.array([self.pipeline.outlet_pressure(q) for q in h2_delivered])
 
         # --- Step 5: Demand satisfaction --------------------
-        hourly_demand_kg_s = self.hourly_demand_kg / 3600.0   # kg/s
+        hourly_demand_kg_s = self.hourly_demand_kg / 3600.0  # kg/s
 
-        demand_met    = np.minimum(h2_delivered, hourly_demand_kg_s)
-        demand_unmet  = np.maximum(hourly_demand_kg_s - h2_delivered, 0)
+        demand_met = np.minimum(h2_delivered, hourly_demand_kg_s)
+        demand_unmet = np.maximum(hourly_demand_kg_s - h2_delivered, 0)
         demand_excess = np.maximum(h2_delivered - hourly_demand_kg_s, 0)
 
         # --- Energy accounting (MWh per timestep) -----------
-        wind_energy_mwh      = wind_power_mw    * dt
-        elec_energy_mwh      = actual_power_mw  * dt
-        curtailed_energy_mwh = wind_curtailed   * dt + ramp_curtailed_mw * dt
+        wind_energy_mwh = wind_power_mw * dt
+        elec_energy_mwh = actual_power_mw * dt
+        curtailed_energy_mwh = wind_curtailed * dt + ramp_curtailed_mw * dt
 
         # H2 in kg per timestep
-        h2_produced_kg  = h2_requested  * 3600.0 * dt
-        h2_delivered_kg = h2_delivered  * 3600.0 * dt
-        h2_demand_kg    = np.full(n, self.hourly_demand_kg * dt)
+        h2_produced_kg = h2_requested * 3600.0 * dt
+        h2_delivered_kg = h2_delivered * 3600.0 * dt
+        h2_demand_kg = np.full(n, self.hourly_demand_kg * dt)
 
-        return pd.DataFrame({
-            # Inputs
-            "wind_speed_10m_ms"      : wind_speed_10m,
-            # Wind farm
-            "wind_power_mw"          : wind_power_mw,
-            "wind_curtailed_mw"      : wind_curtailed,
-            "power_to_electrolyzer_mw": actual_power_mw,
-            # Electrolyzer
-            "load_fraction"          : load_fraction,
-            "efficiency"             : efficiency,
-            "h2_produced_kg_s"       : h2_requested,
-            "h2_produced_kg"         : h2_produced_kg,
-            # Pipeline
-            "h2_delivered_kg_s"      : h2_delivered,
-            "h2_delivered_kg"        : h2_delivered_kg,
-            "pipeline_curtailed_kg_s": pipeline_curtailed,
-            "outlet_pressure_bar"    : outlet_pressure,
-            # Demand
-            "h2_demand_kg"           : h2_demand_kg,
-            "demand_met_kg_s"        : demand_met,
-            "demand_unmet_kg_s"      : demand_unmet,
-            "demand_excess_kg_s"     : demand_excess,
-            # Energy accounting
-            "wind_energy_mwh"        : wind_energy_mwh,
-            "electrolyzer_energy_mwh": elec_energy_mwh,
-            "curtailed_energy_mwh"   : curtailed_energy_mwh,
-            # Ramp curtailment
-            "ramp_curtailed_mw"      : ramp_curtailed_mw,
-        })
+        return pd.DataFrame(
+            {
+                # Inputs
+                "wind_speed_10m_ms": wind_speed_10m,
+                # Wind farm
+                "wind_power_mw": wind_power_mw,
+                "wind_curtailed_mw": wind_curtailed,
+                "power_to_electrolyzer_mw": actual_power_mw,
+                # Electrolyzer
+                "load_fraction": load_fraction,
+                "efficiency": efficiency,
+                "h2_produced_kg_s": h2_requested,
+                "h2_produced_kg": h2_produced_kg,
+                # Pipeline
+                "h2_delivered_kg_s": h2_delivered,
+                "h2_delivered_kg": h2_delivered_kg,
+                "pipeline_curtailed_kg_s": pipeline_curtailed,
+                "outlet_pressure_bar": outlet_pressure,
+                # Demand
+                "h2_demand_kg": h2_demand_kg,
+                "demand_met_kg_s": demand_met,
+                "demand_unmet_kg_s": demand_unmet,
+                "demand_excess_kg_s": demand_excess,
+                # Energy accounting
+                "wind_energy_mwh": wind_energy_mwh,
+                "electrolyzer_energy_mwh": elec_energy_mwh,
+                "curtailed_energy_mwh": curtailed_energy_mwh,
+                # Ramp curtailment
+                "ramp_curtailed_mw": ramp_curtailed_mw,
+            }
+        )
 
     # --- KPI calculation ------------------------------------
 
@@ -236,49 +234,46 @@ class GreenHydrogenAsset:
         -------
         dict of KPI name → value
         """
-        total_wind_energy    = results["wind_energy_mwh"].sum()
-        total_elec_energy    = results["electrolyzer_energy_mwh"].sum()
-        total_h2_produced    = results["h2_produced_kg"].sum()
-        total_h2_delivered   = results["h2_delivered_kg"].sum()
-        total_h2_demand      = results["h2_demand_kg"].sum()
-        total_curtailed      = results["curtailed_energy_mwh"].sum()
-
+        total_wind_energy = results["wind_energy_mwh"].sum()
+        total_elec_energy = results["electrolyzer_energy_mwh"].sum()
+        total_h2_produced = results["h2_produced_kg"].sum()
+        total_h2_delivered = results["h2_delivered_kg"].sum()
+        total_h2_demand = results["h2_demand_kg"].sum()
         # Capacity factor
         farm_rated = self.wind_farm.farm_rated_mw
-        hours      = len(results) * self.timestep_hours
-        cf         = total_wind_energy / (farm_rated * hours)
+        hours = len(results) * self.timestep_hours
+        cf = total_wind_energy / (farm_rated * hours)
 
         # System efficiency: H2 energy out / wind energy in
-        lhv_kwh_per_kg   = 33.33
-        h2_energy_mwh    = total_h2_delivered * lhv_kwh_per_kg / 1000.0
+        lhv_kwh_per_kg = 33.33
+        h2_energy_mwh = total_h2_delivered * lhv_kwh_per_kg / 1000.0
         system_efficiency = h2_energy_mwh / total_wind_energy if total_wind_energy > 0 else 0
 
         # Curtailment breakdown
-        wind_curtail_mwh  = results["wind_curtailed_mw"].sum() * self.timestep_hours
-        ramp_curtail_mwh  = results["ramp_curtailed_mw"].sum() * self.timestep_hours
-        pipe_curtail_kg   = results["pipeline_curtailed_kg_s"].sum() * 3600
+        wind_curtail_mwh = results["wind_curtailed_mw"].sum() * self.timestep_hours
+        ramp_curtail_mwh = results["ramp_curtailed_mw"].sum() * self.timestep_hours
+        pipe_curtail_kg = results["pipeline_curtailed_kg_s"].sum() * 3600
 
         # Demand satisfaction
-        demand_coverage = (total_h2_delivered / total_h2_demand * 100
-                           if total_h2_demand > 0 else 0)
+        demand_coverage = total_h2_delivered / total_h2_demand * 100 if total_h2_demand > 0 else 0
 
         # Electrolyzer utilisation
-        online_hours    = (results["load_fraction"] > 0).sum() * self.timestep_hours
-        utilisation     = online_hours / hours * 100
+        online_hours = (results["load_fraction"] > 0).sum() * self.timestep_hours
+        utilisation = online_hours / hours * 100
 
         return {
-            "simulation_hours"          : hours,
-            "wind_energy_mwh"           : round(total_wind_energy, 1),
-            "electrolyzer_energy_mwh"   : round(total_elec_energy, 1),
-            "wind_capacity_factor_pct"  : round(cf * 100, 1),
-            "h2_produced_tonnes"        : round(total_h2_produced / 1000, 2),
-            "h2_delivered_tonnes"       : round(total_h2_delivered / 1000, 2),
-            "h2_demand_tonnes"          : round(total_h2_demand / 1000, 2),
-            "demand_coverage_pct"       : round(demand_coverage, 1),
-            "system_efficiency_pct"     : round(system_efficiency * 100, 1),
-            "wind_curtailment_mwh"      : round(wind_curtail_mwh, 1),
-            "ramp_curtailment_mwh"      : round(ramp_curtail_mwh, 1),
-            "pipeline_curtailment_kg"   : round(pipe_curtail_kg, 1),
+            "simulation_hours": hours,
+            "wind_energy_mwh": round(total_wind_energy, 1),
+            "electrolyzer_energy_mwh": round(total_elec_energy, 1),
+            "wind_capacity_factor_pct": round(cf * 100, 1),
+            "h2_produced_tonnes": round(total_h2_produced / 1000, 2),
+            "h2_delivered_tonnes": round(total_h2_delivered / 1000, 2),
+            "h2_demand_tonnes": round(total_h2_demand / 1000, 2),
+            "demand_coverage_pct": round(demand_coverage, 1),
+            "system_efficiency_pct": round(system_efficiency * 100, 1),
+            "wind_curtailment_mwh": round(wind_curtail_mwh, 1),
+            "ramp_curtailment_mwh": round(ramp_curtail_mwh, 1),
+            "pipeline_curtailment_kg": round(pipe_curtail_kg, 1),
             "electrolyzer_utilisation_pct": round(utilisation, 1),
         }
 
@@ -305,9 +300,12 @@ class GreenHydrogenAsset:
 
     # --- Visualisation --------------------------------------
 
-    def plot_results(self, results: pd.DataFrame,
-                     title: str = "Green Hydrogen Asset — Simulation Results",
-                     save_path: str = None):
+    def plot_results(
+        self,
+        results: pd.DataFrame,
+        title: str = "Green Hydrogen Asset — Simulation Results",
+        save_path: str = None,
+    ):
         """
         Four-panel system overview plot.
 
@@ -317,18 +315,29 @@ class GreenHydrogenAsset:
         Panel 4: Curtailment breakdown
         """
         fig = plt.figure(figsize=(14, 10))
-        gs  = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.3)
+        gs = gridspec.GridSpec(2, 2, hspace=0.4, wspace=0.3)
         hours = np.arange(len(results))
 
         # Panel 1: Wind and electrolyzer power
         ax1 = fig.add_subplot(gs[0, 0])
-        ax1.fill_between(hours, results["wind_power_mw"],
-                         alpha=0.3, color="#2196F3", label="Wind available")
-        ax1.plot(hours, results["power_to_electrolyzer_mw"],
-                 color="#2196F3", linewidth=1.5, label="To electrolyzer")
-        ax1.axhline(self.electrolyzer.rated_power_mw, color="red",
-                    linestyle="--", alpha=0.5, linewidth=1,
-                    label=f"Elec. rated ({self.electrolyzer.rated_power_mw} MW)")
+        ax1.fill_between(
+            hours, results["wind_power_mw"], alpha=0.3, color="#2196F3", label="Wind available"
+        )
+        ax1.plot(
+            hours,
+            results["power_to_electrolyzer_mw"],
+            color="#2196F3",
+            linewidth=1.5,
+            label="To electrolyzer",
+        )
+        ax1.axhline(
+            self.electrolyzer.rated_power_mw,
+            color="red",
+            linestyle="--",
+            alpha=0.5,
+            linewidth=1,
+            label=f"Elec. rated ({self.electrolyzer.rated_power_mw} MW)",
+        )
         ax1.set_xlabel("Hour")
         ax1.set_ylabel("Power (MW)")
         ax1.set_title("Wind Farm → Electrolyzer")
@@ -337,14 +346,28 @@ class GreenHydrogenAsset:
 
         # Panel 2: H2 production vs demand
         ax2 = fig.add_subplot(gs[0, 1])
-        ax2.plot(hours, results["h2_produced_kg"] / 1000,
-                 color="#4CAF50", linewidth=1.5, label="H2 produced (t)")
-        ax2.plot(hours, results["h2_delivered_kg"] / 1000,
-                 color="#8BC34A", linewidth=1.5,
-                 linestyle="--", label="H2 delivered (t)")
-        ax2.axhline(self.hourly_demand_kg / 1000, color="orange",
-                    linestyle=":", linewidth=1.5,
-                    label=f"Demand ({self.hourly_demand_kg/1000:.1f} t/h)")
+        ax2.plot(
+            hours,
+            results["h2_produced_kg"] / 1000,
+            color="#4CAF50",
+            linewidth=1.5,
+            label="H2 produced (t)",
+        )
+        ax2.plot(
+            hours,
+            results["h2_delivered_kg"] / 1000,
+            color="#8BC34A",
+            linewidth=1.5,
+            linestyle="--",
+            label="H2 delivered (t)",
+        )
+        ax2.axhline(
+            self.hourly_demand_kg / 1000,
+            color="orange",
+            linestyle=":",
+            linewidth=1.5,
+            label=f"Demand ({self.hourly_demand_kg / 1000:.1f} t/h)",
+        )
         ax2.set_xlabel("Hour")
         ax2.set_ylabel("H₂ (tonnes/hour)")
         ax2.set_title("H2 Production & Delivery vs Demand")
@@ -353,14 +376,21 @@ class GreenHydrogenAsset:
 
         # Panel 3: Pipeline outlet pressure
         ax3 = fig.add_subplot(gs[1, 0])
-        ax3.plot(hours, results["outlet_pressure_bar"],
-                 color="#9C27B0", linewidth=1.5)
-        ax3.axhline(self.pipeline.min_outlet_pressure, color="red",
-                    linestyle="--", alpha=0.7,
-                    label=f"Min pressure ({self.pipeline.min_outlet_pressure} bar)")
-        ax3.axhline(self.pipeline.inlet_pressure_bar, color="gray",
-                    linestyle=":", alpha=0.5,
-                    label=f"Inlet ({self.pipeline.inlet_pressure_bar} bar)")
+        ax3.plot(hours, results["outlet_pressure_bar"], color="#9C27B0", linewidth=1.5)
+        ax3.axhline(
+            self.pipeline.min_outlet_pressure,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
+            label=f"Min pressure ({self.pipeline.min_outlet_pressure} bar)",
+        )
+        ax3.axhline(
+            self.pipeline.inlet_pressure_bar,
+            color="gray",
+            linestyle=":",
+            alpha=0.5,
+            label=f"Inlet ({self.pipeline.inlet_pressure_bar} bar)",
+        )
         ax3.set_xlabel("Hour")
         ax3.set_ylabel("Pressure (bar)")
         ax3.set_title("Pipeline Outlet Pressure")
@@ -369,13 +399,14 @@ class GreenHydrogenAsset:
 
         # Panel 4: Curtailment breakdown
         ax4 = fig.add_subplot(gs[1, 1])
-        ax4.stackplot(hours,
-                      results["wind_curtailed_mw"],
-                      results["ramp_curtailed_mw"],
-                      labels=["Wind curtailment (MW)",
-                               "Ramp curtailment (MW)"],
-                      colors=["#FF9800", "#F44336"],
-                      alpha=0.7)
+        ax4.stackplot(
+            hours,
+            results["wind_curtailed_mw"],
+            results["ramp_curtailed_mw"],
+            labels=["Wind curtailment (MW)", "Ramp curtailment (MW)"],
+            colors=["#FF9800", "#F44336"],
+            alpha=0.7,
+        )
         ax4.set_xlabel("Hour")
         ax4.set_ylabel("Curtailed power (MW)")
         ax4.set_title("Curtailment Breakdown")
@@ -400,7 +431,7 @@ if __name__ == "__main__":
 
     asset = GreenHydrogenAsset()
 
-    print(f"\nAsset configuration:")
+    print("\nAsset configuration:")
     print(f"  Wind farm rated:       {asset.wind_farm.farm_rated_mw:.0f} MW")
     print(f"  Electrolyzer rated:    {asset.electrolyzer.rated_power_mw:.0f} MW")
     print(f"  Pipeline max flow:     {asset.pipeline.max_feasible_flow_kg_s:.2f} kg/s")
@@ -428,7 +459,6 @@ if __name__ == "__main__":
 
     # --- Test 4: Full plot of variable wind case ------------
     print("\n[Test 4] Plotting variable wind results...")
-    asset.plot_results(results_var,
-                       title="PyNEXUS — Green H2 Asset: Variable Wind Stress Test")
+    asset.plot_results(results_var, title="PyNEXUS — Green H2 Asset: Variable Wind Stress Test")
 
     print("\nDone. Place this file in assets/green_hydrogen_asset.py")

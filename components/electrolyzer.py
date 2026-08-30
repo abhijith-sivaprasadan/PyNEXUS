@@ -25,11 +25,12 @@
 # numbers in this file.
 # ============================================================
 
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-import matplotlib.pyplot as plt
-from pathlib import Path
 
 
 # --- Load config --------------------------------------------
@@ -42,7 +43,7 @@ def _load_config(config_path: str = "config.yaml") -> dict:
 
 
 # --- Constants ----------------------------------------------
-LHV_HYDROGEN_KWH_PER_KG = 33.33   # Lower Heating Value of H2
+LHV_HYDROGEN_KWH_PER_KG = 33.33  # Lower Heating Value of H2
 
 
 # --- Efficiency curve ---------------------------------------
@@ -62,8 +63,8 @@ LHV_HYDROGEN_KWH_PER_KG = 33.33   # Lower Heating Value of H2
 # but that requires electrochemical parameters we don't have
 # for a generic unit.
 
-def efficiency_at_load(load_fraction: float,
-                        nominal_efficiency: float) -> float:
+
+def efficiency_at_load(load_fraction: float, nominal_efficiency: float) -> float:
     """
     Returns electrolyzer efficiency at a given load fraction.
 
@@ -95,6 +96,7 @@ def efficiency_at_load(load_fraction: float,
 
 # --- Core class ---------------------------------------------
 
+
 class PEMElectrolyzer:
     """
     Dynamic model of a PEM electrolyzer unit.
@@ -113,18 +115,18 @@ class PEMElectrolyzer:
         cfg = _load_config(config_path)
         e = cfg["electrolyzer"]
 
-        self.rated_power_mw      = e["rated_power_mw"]
-        self.min_load_fraction   = e["min_load_fraction"]
-        self.max_load_fraction   = e["max_load_fraction"]
-        self.nominal_efficiency  = e["nominal_efficiency"]
-        self.ramp_rate_per_hour   = e["ramp_rate_per_hour"]
+        self.rated_power_mw = e["rated_power_mw"]
+        self.min_load_fraction = e["min_load_fraction"]
+        self.max_load_fraction = e["max_load_fraction"]
+        self.nominal_efficiency = e["nominal_efficiency"]
+        self.ramp_rate_per_hour = e["ramp_rate_per_hour"]
         self.outlet_pressure_bar = e["hydrogen_output_pressure_bar"]
-        self.degradation_rate    = e["degradation_rate_per_year"]
+        self.degradation_rate = e["degradation_rate_per_year"]
 
         # State variables (updated each timestep)
-        self.current_load_fraction = 0.0   # starts offline
-        self.age_years             = 0.0   # for degradation calc
-        self._is_online            = False
+        self.current_load_fraction = 0.0  # starts offline
+        self.age_years = 0.0  # for degradation calc
+        self._is_online = False
 
     # --- Properties -----------------------------------------
 
@@ -143,10 +145,7 @@ class PEMElectrolyzer:
         Each year of operation reduces efficiency by degradation_rate.
         """
         degradation_factor = 1.0 - (self.degradation_rate * self.age_years)
-        base_eta = efficiency_at_load(
-            self.current_load_fraction,
-            self.nominal_efficiency
-        )
+        base_eta = efficiency_at_load(self.current_load_fraction, self.nominal_efficiency)
         return base_eta * degradation_factor
 
     # --- Core methods ----------------------------------------
@@ -181,14 +180,14 @@ class PEMElectrolyzer:
 
         # Efficiency at this load (load-dependent, age-degraded)
         eta = efficiency_at_load(load_fraction, self.nominal_efficiency)
-        eta *= (1.0 - self.degradation_rate * self.age_years)
+        eta *= 1.0 - self.degradation_rate * self.age_years
 
         # Hydrogen energy output (MWh_H2 per hour = MW_H2)
         h2_power_mw = power_mw * eta
 
         # Convert MW_H2 → kg/s using LHV
         # MW = MJ/s, LHV = 33.33 kWh/kg = 120.0 MJ/kg
-        lhv_mj_per_kg = LHV_HYDROGEN_KWH_PER_KG * 3.6   # = 120.0 MJ/kg
+        lhv_mj_per_kg = LHV_HYDROGEN_KWH_PER_KG * 3.6  # = 120.0 MJ/kg
         h2_kg_per_s = (h2_power_mw * 1e6) / (lhv_mj_per_kg * 1e6)
         # Simplifies to:
         h2_kg_per_s = h2_power_mw / lhv_mj_per_kg
@@ -203,7 +202,7 @@ class PEMElectrolyzer:
         at sub-hourly resolution but not at hourly resolution."""
         cfg = _load_config()
         e = cfg["electrolyzer"]
-    
+
         if timestep_hours < 0.5:
             # Sub-hourly: per-minute constraint is meaningful
             timestep_minutes = timestep_hours * 60.0
@@ -224,9 +223,10 @@ class PEMElectrolyzer:
         2  100.0 MW   (hits rated)
         3  100.0 MW   (steady state)
         """
-    def simulate_timeseries(self,
-                             power_input_mw: np.ndarray,
-                             timestep_hours: float = 1.0) -> pd.DataFrame:
+
+    def simulate_timeseries(
+        self, power_input_mw: np.ndarray, timestep_hours: float = 1.0
+    ) -> pd.DataFrame:
         """
         Run the electrolyzer over a time series of power inputs.
 
@@ -255,15 +255,14 @@ class PEMElectrolyzer:
         n = len(power_input_mw)
         max_ramp = self.max_ramp_mw_per_timestep(timestep_hours)
 
-        actual_power   = np.zeros(n)
+        actual_power = np.zeros(n)
         load_fractions = np.zeros(n)
-        efficiencies   = np.zeros(n)
-        h2_kg_s        = np.zeros(n)
+        efficiencies = np.zeros(n)
+        h2_kg_s = np.zeros(n)
 
         current_power = 0.0  # start offline
 
         for i, requested_power in enumerate(power_input_mw):
-
             # Apply ramp rate constraint
             delta = requested_power - current_power
             delta_clamped = np.clip(delta, -max_ramp, max_ramp)
@@ -271,34 +270,40 @@ class PEMElectrolyzer:
 
             # Enforce min/max bounds
             if feasible_power < self.min_power_mw:
-                feasible_power = 0.0   # shut down rather than run below minimum
+                feasible_power = 0.0  # shut down rather than run below minimum
             feasible_power = min(feasible_power, self.max_power_mw)
 
             # Record state
-            actual_power[i]    = feasible_power
-            load_fractions[i]  = feasible_power / self.rated_power_mw if feasible_power > 0 else 0.0
-            efficiencies[i]    = efficiency_at_load(load_fractions[i], self.nominal_efficiency) if feasible_power > 0 else 0.0
-            h2_kg_s[i]         = self.compute_h2_output(feasible_power)
+            actual_power[i] = feasible_power
+            load_fractions[i] = feasible_power / self.rated_power_mw if feasible_power > 0 else 0.0
+            efficiencies[i] = (
+                efficiency_at_load(load_fractions[i], self.nominal_efficiency)
+                if feasible_power > 0
+                else 0.0
+            )
+            h2_kg_s[i] = self.compute_h2_output(feasible_power)
 
             current_power = feasible_power
 
         h2_kg_h = h2_kg_s * 3600.0
         h2_cumulative = np.cumsum(h2_kg_h) * timestep_hours
 
-        return pd.DataFrame({
-            "power_input_mw"   : actual_power,
-            "load_fraction"    : load_fractions,
-            "efficiency"       : efficiencies,
-            "h2_output_kg_s"   : h2_kg_s,
-            "h2_output_kg_h"   : h2_kg_h,
-            "h2_cumulative_kg" : h2_cumulative,
-        })
+        return pd.DataFrame(
+            {
+                "power_input_mw": actual_power,
+                "load_fraction": load_fractions,
+                "efficiency": efficiencies,
+                "h2_output_kg_s": h2_kg_s,
+                "h2_output_kg_h": h2_kg_h,
+                "h2_cumulative_kg": h2_cumulative,
+            }
+        )
 
 
 # --- Visualisation ------------------------------------------
 
-def plot_efficiency_curve(nominal_efficiency: float = 0.70,
-                           save_path: str = None):
+
+def plot_efficiency_curve(nominal_efficiency: float = 0.70, save_path: str = None):
     """
     Plot the load-dependent efficiency curve.
     Useful for reports and the Jupyter notebook walkthrough.
@@ -307,10 +312,20 @@ def plot_efficiency_curve(nominal_efficiency: float = 0.70,
     efficiencies = [efficiency_at_load(x, nominal_efficiency) for x in load_points]
 
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(load_points * 100, np.array(efficiencies) * 100,
-            color="#2196F3", linewidth=2.5, label="PEM efficiency (LHV basis)")
-    ax.axhline(nominal_efficiency * 100, color="gray",
-               linestyle="--", alpha=0.6, label=f"Nominal: {nominal_efficiency*100:.0f}%")
+    ax.plot(
+        load_points * 100,
+        np.array(efficiencies) * 100,
+        color="#2196F3",
+        linewidth=2.5,
+        label="PEM efficiency (LHV basis)",
+    )
+    ax.axhline(
+        nominal_efficiency * 100,
+        color="gray",
+        linestyle="--",
+        alpha=0.6,
+        label=f"Nominal: {nominal_efficiency * 100:.0f}%",
+    )
     ax.set_xlabel("Load fraction (%)")
     ax.set_ylabel("Efficiency (%, LHV)")
     ax.set_title("PEM Electrolyzer Load-Dependent Efficiency Curve")
@@ -340,17 +355,22 @@ if __name__ == "__main__":
     print("\n[Test 1] H2 output vs load fraction:")
     for load_pct in [10, 25, 50, 75, 100]:
         power = elec.rated_power_mw * (load_pct / 100)
-        h2    = elec.compute_h2_output(power)
-        eta   = efficiency_at_load(load_pct / 100, elec.nominal_efficiency)
-        print(f"  {load_pct:3d}% load ({power:6.1f} MW) → "
-              f"η={eta*100:.1f}% → H2={h2*3600:.1f} kg/h")
+        h2 = elec.compute_h2_output(power)
+        eta = efficiency_at_load(load_pct / 100, elec.nominal_efficiency)
+        print(
+            f"  {load_pct:3d}% load ({power:6.1f} MW) → "
+            f"η={eta * 100:.1f}% → H2={h2 * 3600:.1f} kg/h"
+        )
 
     # Test 2: Simulate a step-change in power (ramp constraint visible)
     print("\n[Test 2] Ramp rate constraint — step from 0 to 100 MW:")
-    step_input = np.array([100.0] * 10)   # request full power immediately
+    step_input = np.array([100.0] * 10)  # request full power immediately
     result = elec.simulate_timeseries(step_input, timestep_hours=1.0)
-    print(result[["power_input_mw", "load_fraction",
-                   "efficiency", "h2_output_kg_h"]].to_string(index=True))
+    print(
+        result[["power_input_mw", "load_fraction", "efficiency", "h2_output_kg_h"]].to_string(
+            index=True
+        )
+    )
 
     # Test 3: Plot efficiency curve
     print("\n[Test 3] Plotting efficiency curve...")

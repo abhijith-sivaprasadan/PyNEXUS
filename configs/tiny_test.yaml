@@ -1,0 +1,24 @@
+simulation:
+  time_horizon_hours: 4
+  time_step_hours: 1
+electrolyzer:
+  rated_power_mw: 100.0
+  min_load_fraction: 0.10
+  max_load_fraction: 1.00
+  nominal_efficiency: 0.70
+  ramp_rate_per_hour: 0.40
+  hydrogen_output_pressure_bar: 30.0
+  degradation_rate_per_year: 0.005
+pipeline:
+  length_km: 50.0
+  diameter_m: 0.5
+  roughness_mm: 0.046
+  inlet_pressure_bar: 30.0
+  min_outlet_pressure_bar: 20.0
+  max_flow_kg_per_s: 2.0
+hydrogen_demand:
+  daily_average_kg: 50000
+optimization:
+  solver: highs
+  time_limit_seconds: 60
+  mip_gap: 0.0

@@ -29,11 +29,12 @@
 # That chain is the multi-commodity coupling centrepiece.
 # ============================================================
 
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-import matplotlib.pyplot as plt
-from pathlib import Path
 
 
 # --- Load config --------------------------------------------
@@ -54,8 +55,7 @@ OFFSHORE_SHEAR_EXPONENT = 0.11
 ERA5_REFERENCE_HEIGHT_M = 10.0
 
 
-def wind_speed_at_hub_height(v_10m: float,
-                              hub_height_m: float) -> float:
+def wind_speed_at_hub_height(v_10m: float, hub_height_m: float) -> float:
     """
     Extrapolate wind speed from ERA5 10m reference to hub height
     using the wind shear power law.
@@ -77,11 +77,10 @@ def wind_speed_at_hub_height(v_10m: float,
 
 # --- Single turbine power curve -----------------------------
 
-def single_turbine_power_mw(wind_speed_ms: float,
-                             cut_in: float,
-                             rated_speed: float,
-                             cut_out: float,
-                             rated_power_mw: float) -> float:
+
+def single_turbine_power_mw(
+    wind_speed_ms: float, cut_in: float, rated_speed: float, cut_out: float, rated_power_mw: float
+) -> float:
     """
     Power output of a single turbine at given wind speed.
 
@@ -125,12 +124,13 @@ def single_turbine_power_mw(wind_speed_ms: float,
 # --- Vectorised version for time-series ---------------------
 # Using np.vectorize for clean application over arrays
 
-_turbine_power_vec = np.vectorize(single_turbine_power_mw,
-                                   excluded=["cut_in", "rated_speed",
-                                             "cut_out", "rated_power_mw"])
+_turbine_power_vec = np.vectorize(
+    single_turbine_power_mw, excluded=["cut_in", "rated_speed", "cut_out", "rated_power_mw"]
+)
 
 
 # --- Core class ---------------------------------------------
+
 
 class OffshoreWindFarm:
     """
@@ -151,21 +151,21 @@ class OffshoreWindFarm:
         cfg = _load_config(config_path)
         w = cfg["wind_turbine"]
 
-        self.rated_power_mw     = w["rated_power_mw"]
-        self.n_turbines         = w["n_turbines"]
-        self.hub_height_m       = w["hub_height_m"]
-        self.cut_in_ms          = w["cut_in_wind_speed_ms"]
-        self.rated_ms           = w["rated_wind_speed_ms"]
-        self.cut_out_ms         = w["cut_out_wind_speed_ms"]
+        self.rated_power_mw = w["rated_power_mw"]
+        self.n_turbines = w["n_turbines"]
+        self.hub_height_m = w["hub_height_m"]
+        self.cut_in_ms = w["cut_in_wind_speed_ms"]
+        self.rated_ms = w["rated_wind_speed_ms"]
+        self.cut_out_ms = w["cut_out_wind_speed_ms"]
 
         # Farm-level correction factors
         # Wake loss: downstream turbines receive less wind
         # Typical offshore value: 10-12% (DNV GL / Orsted benchmarks)
-        self.wake_loss_factor   = 0.90    # 10% wake loss
+        self.wake_loss_factor = 0.90  # 10% wake loss
 
         # Availability: accounts for maintenance downtime
         # Modern offshore: ~95% (O&M included)
-        self.availability       = 0.95
+        self.availability = 0.95
 
         # Total rated capacity
         self.farm_rated_mw = self.rated_power_mw * self.n_turbines
@@ -206,7 +206,7 @@ class OffshoreWindFarm:
             cut_in=self.cut_in_ms,
             rated_speed=self.rated_ms,
             cut_out=self.cut_out_ms,
-            rated_power_mw=self.rated_power_mw
+            rated_power_mw=self.rated_power_mw,
         )
 
         # Step 3: scale to farm, apply wake and availability
@@ -224,9 +224,9 @@ class OffshoreWindFarm:
         cf = p_farm.mean() / self.farm_rated_mw
         return cf
 
-    def simulate_timeseries(self,
-                             wind_speed_10m: np.ndarray,
-                             timestep_hours: float = 1.0) -> pd.DataFrame:
+    def simulate_timeseries(
+        self, wind_speed_10m: np.ndarray, timestep_hours: float = 1.0
+    ) -> pd.DataFrame:
         """
         Full time-series simulation with all intermediate values.
 
@@ -257,25 +257,27 @@ class OffshoreWindFarm:
             cut_in=self.cut_in_ms,
             rated_speed=self.rated_ms,
             cut_out=self.cut_out_ms,
-            rated_power_mw=self.rated_power_mw
+            rated_power_mw=self.rated_power_mw,
         )
 
         p_farm = p_single * self.n_turbines * self.wake_loss_factor * self.availability
 
-        return pd.DataFrame({
-            "wind_speed_10m"  : wind_speed_10m,
-            "wind_speed_hub"  : v_hub,
-            "power_single_mw" : p_single,
-            "power_farm_mw"   : p_farm,
-            "capacity_factor" : p_farm / self.farm_rated_mw,
-            "energy_mwh"      : p_farm * timestep_hours,
-        })
+        return pd.DataFrame(
+            {
+                "wind_speed_10m": wind_speed_10m,
+                "wind_speed_hub": v_hub,
+                "power_single_mw": p_single,
+                "power_farm_mw": p_farm,
+                "capacity_factor": p_farm / self.farm_rated_mw,
+                "energy_mwh": p_farm * timestep_hours,
+            }
+        )
 
 
 # --- Visualisation ------------------------------------------
 
-def plot_power_curve(config_path: str = "config.yaml",
-                     save_path: str = None):
+
+def plot_power_curve(config_path: str = "config.yaml", save_path: str = None):
     """
     Plot the single turbine power curve and hub height correction.
     Two panels: (1) power curve, (2) wind shear profile.
@@ -292,7 +294,7 @@ def plot_power_curve(config_path: str = "config.yaml",
         cut_in=w["cut_in_wind_speed_ms"],
         rated_speed=w["rated_wind_speed_ms"],
         cut_out=w["cut_out_wind_speed_ms"],
-        rated_power_mw=w["rated_power_mw"]
+        rated_power_mw=w["rated_power_mw"],
     )
 
     # Farm output from 10m ERA5 wind speed
@@ -302,17 +304,20 @@ def plot_power_curve(config_path: str = "config.yaml",
 
     # Panel 1: Power curve
     ax = axes[0]
-    ax.plot(wind_speeds, p_single, color="#2196F3",
-            linewidth=2.5, label="Single turbine (hub height)")
-    ax.plot(wind_speeds, p_farm, color="#4CAF50",
-            linewidth=2, linestyle="--",
-            label=f"Farm ({w['n_turbines']} turbines, wake+avail)")
-    ax.axvline(w["cut_in_wind_speed_ms"], color="gray",
-               linestyle=":", alpha=0.7, label="Cut-in")
-    ax.axvline(w["rated_wind_speed_ms"], color="orange",
-               linestyle=":", alpha=0.7, label="Rated")
-    ax.axvline(w["cut_out_wind_speed_ms"], color="red",
-               linestyle=":", alpha=0.7, label="Cut-out")
+    ax.plot(
+        wind_speeds, p_single, color="#2196F3", linewidth=2.5, label="Single turbine (hub height)"
+    )
+    ax.plot(
+        wind_speeds,
+        p_farm,
+        color="#4CAF50",
+        linewidth=2,
+        linestyle="--",
+        label=f"Farm ({w['n_turbines']} turbines, wake+avail)",
+    )
+    ax.axvline(w["cut_in_wind_speed_ms"], color="gray", linestyle=":", alpha=0.7, label="Cut-in")
+    ax.axvline(w["rated_wind_speed_ms"], color="orange", linestyle=":", alpha=0.7, label="Rated")
+    ax.axvline(w["cut_out_wind_speed_ms"], color="red", linestyle=":", alpha=0.7, label="Cut-out")
     ax.set_xlabel("Wind speed at hub height (m/s)")
     ax.set_ylabel("Power output (MW)")
     ax.set_title("Offshore Wind Farm Power Curve")
@@ -324,8 +329,7 @@ def plot_power_curve(config_path: str = "config.yaml",
     v_hub = wind_speed_at_hub_height(v_10m, w["hub_height_m"])
     ax2 = axes[1]
     ax2.plot(v_10m, v_hub, color="#9C27B0", linewidth=2.5)
-    ax2.plot([0, 25], [0, 25], color="gray", linestyle="--",
-             alpha=0.5, label="1:1 reference")
+    ax2.plot([0, 25], [0, 25], color="gray", linestyle="--", alpha=0.5, label="1:1 reference")
     ax2.set_xlabel("Wind speed at 10m ERA5 (m/s)")
     ax2.set_ylabel(f"Wind speed at {w['hub_height_m']}m hub (m/s)")
     ax2.set_title(f"Wind Shear Correction (α={OFFSHORE_SHEAR_EXPONENT})")
@@ -357,23 +361,24 @@ if __name__ == "__main__":
         v_hub = wind_speed_at_hub_height(v, farm.hub_height_m)
         p = farm.power_output_mw(np.array([float(v)]))[0]
         cf = p / farm.farm_rated_mw
-        print(f"  v_10m={v:3d} m/s → v_hub={v_hub:5.1f} m/s "
-              f"→ P={p:6.1f} MW  CF={cf*100:.0f}%")
+        print(f"  v_10m={v:3d} m/s → v_hub={v_hub:5.1f} m/s → P={p:6.1f} MW  CF={cf * 100:.0f}%")
 
     # Test 2: Simulate a 24-hour synthetic wind profile
     print("\n[Test 2] 24-hour synthetic wind profile:")
     # Realistic North Sea diurnal pattern — speeds vary 6-16 m/s
     np.random.seed(42)
-    wind_24h = 10 + 4 * np.sin(np.linspace(0, 2*np.pi, 24)) \
-               + np.random.normal(0, 1.0, 24)
+    wind_24h = 10 + 4 * np.sin(np.linspace(0, 2 * np.pi, 24)) + np.random.normal(0, 1.0, 24)
     wind_24h = np.clip(wind_24h, 0, 30)
 
     result = farm.simulate_timeseries(wind_24h)
-    print(result[["wind_speed_10m", "wind_speed_hub",
-                   "power_farm_mw", "capacity_factor"]].round(2).to_string())
+    print(
+        result[["wind_speed_10m", "wind_speed_hub", "power_farm_mw", "capacity_factor"]]
+        .round(2)
+        .to_string()
+    )
 
     cf_avg = farm.capacity_factor(wind_24h)
-    print(f"\n  Average capacity factor: {cf_avg*100:.1f}%")
+    print(f"\n  Average capacity factor: {cf_avg * 100:.1f}%")
     print(f"  Total energy (24h): {result['energy_mwh'].sum():.0f} MWh")
 
     # Test 3: Plot power curve

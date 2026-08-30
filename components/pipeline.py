@@ -38,11 +38,12 @@
 #     → demand node delivery (kg/s, bar)
 # ============================================================
 
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-import matplotlib.pyplot as plt
-from pathlib import Path
 
 
 # --- Load config --------------------------------------------
@@ -54,61 +55,59 @@ def _load_config(config_path: str = "config.yaml") -> dict:
 
 
 # --- Physical constants -------------------------------------
-R_UNIVERSAL       = 8314.0    # J / (kmol·K)
-M_HYDROGEN        = 2.016     # kg/kmol
-R_HYDROGEN        = R_UNIVERSAL / M_HYDROGEN   # J/(kg·K) = 4124.0
-T_STANDARD_K      = 288.15    # 15°C in Kelvin (pipeline standard)
-P_STANDARD_PA     = 101325.0  # 1 atm in Pa
+R_UNIVERSAL = 8314.0  # J / (kmol·K)
+M_HYDROGEN = 2.016  # kg/kmol
+R_HYDROGEN = R_UNIVERSAL / M_HYDROGEN  # J/(kg·K) = 4124.0
+T_STANDARD_K = 288.15  # 15°C in Kelvin (pipeline standard)
+P_STANDARD_PA = 101325.0  # 1 atm in Pa
 
 # Van der Waals constants for hydrogen
-VDW_A_H2          = 0.02476   # Pa·m⁶/mol²
-VDW_B_H2          = 2.661e-5  # m³/mol
+VDW_A_H2 = 0.02476  # Pa·m⁶/mol²
+VDW_B_H2 = 2.661e-5  # m³/mol
 
 
 # --- Hydrogen gas properties --------------------------------
 
-def compressibility_factor_h2(pressure_bar: float,
-                               temperature_k: float = T_STANDARD_K) -> float:
+
+def compressibility_factor_h2(pressure_bar: float, temperature_k: float = T_STANDARD_K) -> float:
     """
     Van der Waals compressibility factor Z for hydrogen.
     Uses first-order virial expansion: Z = 1 + (b - a/RT) * P/RT
     At 30 bar, 15C: Z ~ 1.02
     """
-    R_MOL = 8.314          # J/(mol·K) — molar gas constant
-    P_pa  = pressure_bar * 1e5
+    R_MOL = 8.314  # J/(mol·K) — molar gas constant
+    P_pa = pressure_bar * 1e5
 
-    a = VDW_A_H2           # Pa·m6/mol2
-    b = VDW_B_H2           # m3/mol
+    a = VDW_A_H2  # Pa·m6/mol2
+    b = VDW_B_H2  # m3/mol
 
-    RT = R_MOL * temperature_k                 # J/mol
-    Z  = 1.0 + (b - a / RT) * (P_pa / RT)
+    RT = R_MOL * temperature_k  # J/mol
+    Z = 1.0 + (b - a / RT) * (P_pa / RT)
 
     return max(float(Z), 1.0)
 
 
-def hydrogen_density_kg_m3(pressure_bar: float,
-                            temperature_k: float = T_STANDARD_K) -> float:
+def hydrogen_density_kg_m3(pressure_bar: float, temperature_k: float = T_STANDARD_K) -> float:
     """
     Hydrogen gas density at given pressure and temperature.
     Uses real gas equation: ρ = P / (Z * R_H2 * T)
     """
     P_pa = pressure_bar * 1e5
-    Z    = compressibility_factor_h2(pressure_bar, temperature_k)
+    Z = compressibility_factor_h2(pressure_bar, temperature_k)
     return P_pa / (Z * R_HYDROGEN * temperature_k)
 
 
 # --- Friction factor -----------------------------------------
 
-def friction_factor_chen(diameter_m: float,
-                          roughness_m: float,
-                          reynolds: float) -> float:
+
+def friction_factor_chen(diameter_m: float, roughness_m: float, reynolds: float) -> float:
     """
     Chen (1979) explicit approximation to Colebrook-White equation.
     Avoids iterative solution, accuracy within 0.1% for Re > 3000.
     Same approach used in pandapipes gas flow solver.
     """
     if reynolds < 2300:
-        return 64.0 / reynolds   # Laminar: Hagen-Poiseuille
+        return 64.0 / reynolds  # Laminar: Hagen-Poiseuille
 
     eps_D = roughness_m / diameter_m
     A = (eps_D / 3.7065) - (5.0452 / reynolds) * np.log10(
@@ -117,10 +116,12 @@ def friction_factor_chen(diameter_m: float,
     return (-2.0 * np.log10(A)) ** (-2)
 
 
-def reynolds_number_h2(mass_flow_kg_s: float,
-                        diameter_m: float,
-                        pressure_bar: float,
-                        temperature_k: float = T_STANDARD_K) -> float:
+def reynolds_number_h2(
+    mass_flow_kg_s: float,
+    diameter_m: float,
+    pressure_bar: float,
+    temperature_k: float = T_STANDARD_K,
+) -> float:
     """
     Reynolds number for hydrogen flow in a pipe.
     Re = 4 * ṁ / (π * D * μ)
@@ -132,12 +133,15 @@ def reynolds_number_h2(mass_flow_kg_s: float,
 
 # --- Weymouth equation --------------------------------------
 
-def weymouth_outlet_pressure(mass_flow_kg_s: float,
-                              inlet_pressure_bar: float,
-                              length_km: float,
-                              diameter_m: float,
-                              roughness_mm: float = 0.046,
-                              temperature_k: float = T_STANDARD_K) -> float:
+
+def weymouth_outlet_pressure(
+    mass_flow_kg_s: float,
+    inlet_pressure_bar: float,
+    length_km: float,
+    diameter_m: float,
+    roughness_mm: float = 0.046,
+    temperature_k: float = T_STANDARD_K,
+) -> float:
     """
     Weymouth equation for compressible gas pipeline flow.
 
@@ -153,32 +157,35 @@ def weymouth_outlet_pressure(mass_flow_kg_s: float,
     if mass_flow_kg_s <= 0:
         return inlet_pressure_bar
 
-    L_m        = length_km * 1000.0
+    L_m = length_km * 1000.0
     roughness_m = roughness_mm / 1000.0
-    P_in_pa    = inlet_pressure_bar * 1e5
+    P_in_pa = inlet_pressure_bar * 1e5
 
-    Z  = compressibility_factor_h2(inlet_pressure_bar, temperature_k)
+    Z = compressibility_factor_h2(inlet_pressure_bar, temperature_k)
     Re = reynolds_number_h2(mass_flow_kg_s, diameter_m, inlet_pressure_bar)
-    f  = friction_factor_chen(diameter_m, roughness_m, Re)
+    f = friction_factor_chen(diameter_m, roughness_m, Re)
 
     # Weymouth pressure drop (Pa²)
-    delta_P2 = (8.0 * f * L_m * Z * R_HYDROGEN * temperature_k
-                * mass_flow_kg_s**2) / (np.pi**2 * diameter_m**5)
+    delta_P2 = (8.0 * f * L_m * Z * R_HYDROGEN * temperature_k * mass_flow_kg_s**2) / (
+        np.pi**2 * diameter_m**5
+    )
 
     P_out_sq = P_in_pa**2 - delta_P2
 
     if P_out_sq <= 0:
         return 0.0
 
-    return np.sqrt(P_out_sq) / 1e5   # convert Pa → bar
+    return np.sqrt(P_out_sq) / 1e5  # convert Pa → bar
 
 
-def max_feasible_flow(inlet_pressure_bar: float,
-                      min_outlet_pressure_bar: float,
-                      length_km: float,
-                      diameter_m: float,
-                      roughness_mm: float = 0.046,
-                      temperature_k: float = T_STANDARD_K) -> float:
+def max_feasible_flow(
+    inlet_pressure_bar: float,
+    min_outlet_pressure_bar: float,
+    length_km: float,
+    diameter_m: float,
+    roughness_mm: float = 0.046,
+    temperature_k: float = T_STANDARD_K,
+) -> float:
     """
     Binary search for maximum flow that keeps outlet above minimum pressure.
     This is the pipeline capacity constraint used in the optimizer.
@@ -186,10 +193,9 @@ def max_feasible_flow(inlet_pressure_bar: float,
     low, high = 0.0, 20.0
 
     for _ in range(50):
-        mid   = (low + high) / 2.0
+        mid = (low + high) / 2.0
         P_out = weymouth_outlet_pressure(
-            mid, inlet_pressure_bar, length_km,
-            diameter_m, roughness_mm, temperature_k
+            mid, inlet_pressure_bar, length_km, diameter_m, roughness_mm, temperature_k
         )
         if P_out >= min_outlet_pressure_bar:
             low = mid
@@ -200,6 +206,7 @@ def max_feasible_flow(inlet_pressure_bar: float,
 
 
 # --- Core class ---------------------------------------------
+
 
 class HydrogenPipeline:
     """
@@ -223,15 +230,15 @@ class HydrogenPipeline:
 
     def __init__(self, config_path: str = "config.yaml"):
         cfg = _load_config(config_path)
-        p   = cfg["pipeline"]
+        p = cfg["pipeline"]
 
-        self.length_km           = p["length_km"]
-        self.diameter_m          = p["diameter_m"]
-        self.roughness_mm        = p["roughness_mm"]
-        self.inlet_pressure_bar  = p["inlet_pressure_bar"]
+        self.length_km = p["length_km"]
+        self.diameter_m = p["diameter_m"]
+        self.roughness_mm = p["roughness_mm"]
+        self.inlet_pressure_bar = p["inlet_pressure_bar"]
         self.min_outlet_pressure = p["min_outlet_pressure_bar"]
-        self.max_flow_kg_s       = p["max_flow_kg_per_s"]
-        self.temperature_k       = T_STANDARD_K
+        self.max_flow_kg_s = p["max_flow_kg_per_s"]
+        self.temperature_k = T_STANDARD_K
 
     @property
     def max_feasible_flow_kg_s(self) -> float:
@@ -242,7 +249,7 @@ class HydrogenPipeline:
             self.length_km,
             self.diameter_m,
             self.roughness_mm,
-            self.temperature_k
+            self.temperature_k,
         )
 
     def outlet_pressure(self, mass_flow_kg_s: float) -> float:
@@ -253,7 +260,7 @@ class HydrogenPipeline:
             self.length_km,
             self.diameter_m,
             self.roughness_mm,
-            self.temperature_k
+            self.temperature_k,
         )
 
     def pressure_drop(self, mass_flow_kg_s: float) -> float:
@@ -277,8 +284,7 @@ class HydrogenPipeline:
             return requested_flow_kg_s
         return self.max_feasible_flow_kg_s
 
-    def simulate_timeseries(self,
-                             h2_flow_kg_s: np.ndarray) -> pd.DataFrame:
+    def simulate_timeseries(self, h2_flow_kg_s: np.ndarray) -> pd.DataFrame:
         """
         Simulate pipeline over a time series of H2 flows
         from the electrolyzer.
@@ -296,57 +302,66 @@ class HydrogenPipeline:
         h2_flow_kg_s = np.asarray(h2_flow_kg_s, dtype=float)
         n = len(h2_flow_kg_s)
 
-        feasible_flow    = np.zeros(n)
-        curtailed        = np.zeros(n)
+        feasible_flow = np.zeros(n)
+        curtailed = np.zeros(n)
         outlet_pressures = np.zeros(n)
-        pressure_drops   = np.zeros(n)
-        feasibility      = np.zeros(n, dtype=bool)
+        pressure_drops = np.zeros(n)
+        feasibility = np.zeros(n, dtype=bool)
 
         for i, flow in enumerate(h2_flow_kg_s):
-            ff               = self.constrained_flow(flow)
-            P_out            = self.outlet_pressure(ff)
+            ff = self.constrained_flow(flow)
+            P_out = self.outlet_pressure(ff)
             feasible_flow[i] = ff
-            curtailed[i]     = flow - ff
+            curtailed[i] = flow - ff
             outlet_pressures[i] = P_out
-            pressure_drops[i]   = self.inlet_pressure_bar - P_out
-            feasibility[i]      = self.is_feasible(flow)
+            pressure_drops[i] = self.inlet_pressure_bar - P_out
+            feasibility[i] = self.is_feasible(flow)
 
-        return pd.DataFrame({
-            "requested_flow_kg_s" : h2_flow_kg_s,
-            "feasible_flow_kg_s"  : feasible_flow,
-            "curtailed_kg_s"      : curtailed,
-            "outlet_pressure_bar" : outlet_pressures,
-            "pressure_drop_bar"   : pressure_drops,
-            "feasible"            : feasibility,
-        })
+        return pd.DataFrame(
+            {
+                "requested_flow_kg_s": h2_flow_kg_s,
+                "feasible_flow_kg_s": feasible_flow,
+                "curtailed_kg_s": curtailed,
+                "outlet_pressure_bar": outlet_pressures,
+                "pressure_drop_bar": pressure_drops,
+                "feasible": feasibility,
+            }
+        )
 
 
 # --- Visualisation ------------------------------------------
 
-def plot_pipeline_characteristics(config_path: str = "config.yaml",
-                                   save_path: str = None):
+
+def plot_pipeline_characteristics(config_path: str = "config.yaml", save_path: str = None):
     """
     Two-panel: outlet pressure and pressure drop vs mass flow.
     Shows the pipeline capacity constraint visually.
     """
-    pipe  = HydrogenPipeline(config_path)
+    pipe = HydrogenPipeline(config_path)
     flows = np.linspace(0, pipe.max_flow_kg_s * 1.5, 200)
 
     outlets = [pipe.outlet_pressure(q) for q in flows]
-    drops   = [pipe.pressure_drop(q)   for q in flows]
+    drops = [pipe.pressure_drop(q) for q in flows]
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
     ax = axes[0]
     ax.plot(flows, outlets, color="#2196F3", linewidth=2.5)
-    ax.axhline(pipe.min_outlet_pressure, color="red", linestyle="--",
-               label=f"Min delivery: {pipe.min_outlet_pressure} bar")
-    ax.axvline(pipe.max_feasible_flow_kg_s, color="orange", linestyle=":",
-               label=f"Max feasible: {pipe.max_feasible_flow_kg_s:.2f} kg/s")
+    ax.axhline(
+        pipe.min_outlet_pressure,
+        color="red",
+        linestyle="--",
+        label=f"Min delivery: {pipe.min_outlet_pressure} bar",
+    )
+    ax.axvline(
+        pipe.max_feasible_flow_kg_s,
+        color="orange",
+        linestyle=":",
+        label=f"Max feasible: {pipe.max_feasible_flow_kg_s:.2f} kg/s",
+    )
     ax.set_xlabel("H₂ mass flow (kg/s)")
     ax.set_ylabel("Outlet pressure (bar)")
-    ax.set_title(f"Pipeline Outlet Pressure\n"
-                 f"(L={pipe.length_km} km, D={pipe.diameter_m} m)")
+    ax.set_title(f"Pipeline Outlet Pressure\n(L={pipe.length_km} km, D={pipe.diameter_m} m)")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, pipe.inlet_pressure_bar * 1.1)
@@ -374,7 +389,7 @@ if __name__ == "__main__":
 
     pipe = HydrogenPipeline()
 
-    print(f"\nPipeline config:")
+    print("\nPipeline config:")
     print(f"  Length:          {pipe.length_km} km")
     print(f"  Diameter:        {pipe.diameter_m} m")
     print(f"  Inlet pressure:  {pipe.inlet_pressure_bar} bar")
@@ -384,13 +399,12 @@ if __name__ == "__main__":
     print("\n[Test 1] Outlet pressure vs mass flow:")
     for q in [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]:
         P_out = pipe.outlet_pressure(q)
-        dP    = pipe.pressure_drop(q)
-        feas  = "OK" if pipe.is_feasible(q) else "INFEASIBLE"
-        print(f"  m={q:.1f} kg/s → P_out={P_out:.2f} bar  "
-              f"dP={dP:.2f} bar  [{feas}]")
+        dP = pipe.pressure_drop(q)
+        feas = "OK" if pipe.is_feasible(q) else "INFEASIBLE"
+        print(f"  m={q:.1f} kg/s → P_out={P_out:.2f} bar  dP={dP:.2f} bar  [{feas}]")
 
     # Test 2: max feasible flow
-    q_max   = pipe.max_feasible_flow_kg_s
+    q_max = pipe.max_feasible_flow_kg_s
     binding = "physics" if q_max < pipe.max_flow_kg_s else "config"
     print(f"\n[Test 2] Max feasible flow: {q_max:.3f} kg/s")
     print(f"  Config limit:       {pipe.max_flow_kg_s:.1f} kg/s")
@@ -398,16 +412,15 @@ if __name__ == "__main__":
 
     # Test 3: pipeline response to variable electrolyzer output
     print("\n[Test 3] Pipeline response to variable H2 flow:")
-    sim_flows = np.array([0.0, 0.5, 1.0, q_max * 0.9,
-                           q_max, q_max * 1.1, q_max * 1.5])
+    sim_flows = np.array([0.0, 0.5, 1.0, q_max * 0.9, q_max, q_max * 1.1, q_max * 1.5])
     result = pipe.simulate_timeseries(sim_flows)
     print(result.round(3).to_string())
 
     # Test 4: H2 density and compressibility
-    print(f"\n[Test 4] H2 real gas properties:")
+    print("\n[Test 4] H2 real gas properties:")
     for p_bar in [1, 10, 20, 30]:
         rho = hydrogen_density_kg_m3(p_bar)
-        Z   = compressibility_factor_h2(p_bar)
+        Z = compressibility_factor_h2(p_bar)
         print(f"  P={p_bar:3d} bar → rho={rho:.3f} kg/m3  Z={Z:.4f}")
 
     # Test 5: plot
