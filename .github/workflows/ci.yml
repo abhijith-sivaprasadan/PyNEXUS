@@ -24,3 +24,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
+      - name: Scientific reference smoke test
+        run: |
+          pynexus solve --config configs/tiny_test.yaml --synthetic --output .ci-output
+          pynexus verify --run .ci-output
