@@ -106,3 +106,18 @@ def test_nonfinite_carbon_input_is_rejected(tmp_path):
         optimizer(tmp_path).optimize(
             [100.0], [10.0], objective="minimize_emissions", carbon_intensity=[np.nan]
         )
+
+
+@pytest.mark.parametrize("carbon", [[np.nan], [-1.0], [np.inf]])
+def test_cost_mode_still_validates_provided_carbon(tmp_path, carbon):
+    with pytest.raises(ValueError, match="carbon"):
+        optimizer(tmp_path).optimize([100.0], [10.0], carbon_intensity=carbon)
+
+
+def test_nonhourly_summary_uses_interval_labels(tmp_path, capsys):
+    opt = optimizer(tmp_path, dt=0.5)
+    result = opt.optimize([100.0, 100.0], [10.0, 10.0])
+    opt.print_solution_summary(result)
+    output = capsys.readouterr().out
+    assert "intervals" in output
+    assert "Intervals demand met" in output

@@ -185,9 +185,9 @@ class ElectrolyzerDispatchOptimizer:
             raise ValueError("wind_power_mw must be non-negative")
         if demand_mode not in {"hourly", "cumulative"}:
             raise ValueError(f"Unknown demand_mode: {demand_mode}")
-        if objective == "minimize_emissions":
-            if carbon_intensity is None:
-                raise ValueError("carbon_intensity required")
+        if objective == "minimize_emissions" and carbon_intensity is None:
+            raise ValueError("carbon_intensity required")
+        if carbon_intensity is not None:
             carbon_intensity = vector(carbon_intensity, "carbon_intensity")
             if len(carbon_intensity) != T or (carbon_intensity < 0).any():
                 raise ValueError("carbon_intensity must match horizon and be non-negative")
@@ -372,7 +372,7 @@ class ElectrolyzerDispatchOptimizer:
         print(f"  Objective value:         {result['objective_value']:.2f}")
         print(f"  Hours optimized:         {len(df) * self.dt:g}")
         print(f"  Avg power dispatch:      {df['power_optimized_mw'].mean():.1f} MW")
-        print(f"  Electrolyzer online:     {df['online_status'].sum()}/{len(df)} hours")
+        print(f"  Electrolyzer online:     {df['online_status'].sum()}/{len(df)} intervals")
         print(
             f"  Total H2 produced:       {df['h2_produced_kg_h'].sum() * self.dt / 1000:.2f} tonnes"
         )
@@ -380,7 +380,7 @@ class ElectrolyzerDispatchOptimizer:
             f"  Total H2 demand:         {df['h2_demand_kg_h'].sum() * self.dt / 1000:.2f} tonnes"
         )
         print(f"  Unmet demand (slack):    {total_slack:.0f} kg total")
-        print(f"  Hours demand fully met:  {df['demand_met'].sum()}/{len(df)}")
+        print(f"  Intervals demand met:    {df['demand_met'].sum()}/{len(df)}")
         print(f"  Total electricity cost:  EUR {df['cost_eur'].sum():.0f}")
         print(f"  Avg electricity price:   EUR {df['electricity_price'].mean():.1f}/MWh")
         print("=" * 55)
@@ -434,18 +434,18 @@ class ElectrolyzerDispatchOptimizer:
                 "Cost-optimal": [
                     f"{cost_of_cost_opt:.0f}",
                     f"{emis_of_cost_opt:.0f}",
-                    f"{df_c['h2_produced_kg_h'].sum():.0f}",
+                    f"{df_c['h2_produced_kg_h'].sum() * self.dt:.0f}",
                     f"{df_c['power_optimized_mw'].mean():.1f}",
-                    f"{(df_c['power_optimized_mw'] >= self.p_max * 0.99).sum()}",
-                    f"{(df_c['online_status'] == 0).sum()}",
+                    f"{(df_c['power_optimized_mw'] >= self.p_max * 0.99).sum() * self.dt:g}",
+                    f"{(df_c['online_status'] == 0).sum() * self.dt:g}",
                 ],
                 "Emissions-optimal": [
                     f"{cost_of_emis_opt:.0f}",
                     f"{emis_of_emis_opt:.0f}",
-                    f"{df_e['h2_produced_kg_h'].sum():.0f}",
+                    f"{df_e['h2_produced_kg_h'].sum() * self.dt:.0f}",
                     f"{df_e['power_optimized_mw'].mean():.1f}",
-                    f"{(df_e['power_optimized_mw'] >= self.p_max * 0.99).sum()}",
-                    f"{(df_e['online_status'] == 0).sum()}",
+                    f"{(df_e['power_optimized_mw'] >= self.p_max * 0.99).sum() * self.dt:g}",
+                    f"{(df_e['online_status'] == 0).sum() * self.dt:g}",
                 ],
             }
         )
@@ -523,7 +523,7 @@ def plot_optimization_result(
     ax3c.step(
         hours, df["power_optimized_mw"], color="#2196F3", linewidth=1.5, where="post", alpha=0.8
     )
-    ax3.set_xlabel("Hour")
+    ax3.set_xlabel("Interval index")
     ax3.set_ylabel("Price (EUR/MWh)", color="#FF9800")
     ax3c.set_ylabel("Power dispatch (MW)", color="#2196F3")
     ax3.set_title("Price Signal vs Dispatch")
@@ -588,7 +588,7 @@ if __name__ == "__main__":
     print("\nOptimizer parameters:")
     print(f"  Electrolyzer rated:    {opt.p_rated} MW")
     print(f"  Min load:              {opt.p_min} MW")
-    print(f"  Max ramp/hour:         {opt.max_ramp_mw} MW/h")
+    print(f"  Max ramp/interval:     {opt.max_ramp_mw} MW per interval")
     print(f"  H2 coefficient:        {opt.h2_coeff:.2f} kg/MWh")
     print(f"  Hourly H2 demand:      {opt.hourly_demand_kg:.0f} kg/h")
     print(f"  Demand penalty:        EUR {opt.DEMAND_PENALTY}/kg unmet")
