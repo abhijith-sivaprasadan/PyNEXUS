@@ -22,6 +22,37 @@ def test_tiny_run_is_verified_and_tampering_fails(tmp_path):
     assert main(["verify", "--run", str(out)]) == 2
 
 
+def test_solve_with_all_phase_a_b_flags_end_to_end(tmp_path):
+    """The CLI --enable-storage/--enable-grid/--enable-heat flags, backed by
+    an auto-generated synthetic heat_demand_mw column for --synthetic, must
+    round-trip through solve -> manifest -> verify exactly like the baseline
+    path — Phase A/B are otherwise only reachable from direct Python calls."""
+    out = tmp_path / "run"
+    exit_code = main(
+        [
+            "solve",
+            "--config",
+            "configs/tiny_test.yaml",
+            "--synthetic",
+            "--output",
+            str(out),
+            "--demand-mode",
+            "hourly",
+            "--enable-storage",
+            "--enable-grid",
+            "--enable-heat",
+        ]
+    )
+    assert exit_code == 0
+    manifest = json.loads((out / "run_manifest.json").read_text())
+    assert manifest["enable_storage"] and manifest["enable_grid"] and manifest["enable_heat"]
+    assert manifest["verified"]
+    inputs = (out / "inputs.csv").read_text()
+    assert "heat_demand_mw" in inputs.splitlines()[0]
+
+    assert main(["verify", "--run", str(out)]) == 0
+
+
 def test_fetch_era5_wires_arguments_through(monkeypatch, tmp_path, capsys):
     calls = {}
 

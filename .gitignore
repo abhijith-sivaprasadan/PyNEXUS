@@ -6,7 +6,8 @@ __pycache__/
 build/
 dist/
 *.egg-info/
-outputs/
+outputs/*
+!outputs/annual_2023/
 .ci-output/
 .env
 *.grib

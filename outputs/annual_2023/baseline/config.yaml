@@ -1,13 +1,17 @@
 # ============================================================
-# hydrogen-electricity-network — System Configuration
+# hydrogen-electricity-network — Annual (8,760h) Configuration
 # ============================================================
+# Same as config.yaml, but the full-year horizon actually run for
+# Phase C5/A/B (see docs/reproducibility.md's 2023 annual-run section
+# and docs/validation.md). Added only after that run succeeded, per
+# REVAMP_PLAN.md's own instruction — this file did not exist before then.
 # All physical, economic, and simulation parameters live here.
 # No hardcoded constants in source files — always reference config.
 # ============================================================
 
 # --- Simulation settings ------------------------------------
 simulation:
-  time_horizon_hours: 168        # 1 week (7 days x 24h) for initial runs
+  time_horizon_hours: 8760       # full year (365 days x 24h); config.yaml's 168h is the weekly default
   time_step_hours: 1             # Hourly resolution
   start_date: "2023-01-01"       # ISO format
   timezone: "Europe/Amsterdam"   # TNO is Netherlands-based

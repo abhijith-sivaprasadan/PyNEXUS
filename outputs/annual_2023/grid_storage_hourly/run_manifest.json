@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "git_sha": "e75ac7ef8d50afebd7f141b7c9aa813f90e293fe",
+  "working_tree_dirty": true,
+  "snapshots": 8760,
+  "time_step_hours": 1,
+  "input_source": {
+    "kind": "era5_wind_synthetic_price",
+    "wind_csv_sha256": "5d33e25c4c34a10d1e5a8dcb5c780b4efeb18b7b1fe7c380c2680e951844784c",
+    "price_carbon_generator": "deterministic_daily_sines_v1",
+    "note": "wind is real ERA5 (see data/provenance_records/); price/carbon are synthetic, not ENTSO-E"
+  },
+  "enable_storage": true,
+  "enable_grid": true,
+  "enable_heat": false,
+  "config_sha256": "062cf9b79121205496750e97ccbb606a72e81200cf9b2a098b754e7d0915ebc1",
+  "input_sha256": "7de2b21416e2b7c004e3ed3eb577e96ac9b744cd30ed863bdc6999ed00c687ac",
+  "environment": {
+    "python": "3.10.0",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "packages": {
+      "pyomo": "6.10.0",
+      "highspy": "1.13.1",
+      "numpy": "2.2.6",
+      "pandas": "2.3.3",
+      "pyyaml": "6.0.2"
+    }
+  },
+  "solver": {
+    "name": "highs",
+    "threads": 1,
+    "random_seed": 0,
+    "time_limit_s": 300,
+    "mip_rel_gap": 0.01
+  },
+  "model": {
+    "variables": 78840,
+    "binary_variables": 8760,
+    "constraints": 78839
+  },
+  "result": {
+    "solver_status": "ok",
+    "termination_condition": "optimal",
+    "objective_value": 2943976563.2821856,
+    "solve_wall_time_s": 16.741988299996592
+  },
+  "objective": "minimize_cost",
+  "demand_mode": "hourly",
+  "benchmark_scope": "reference run; not the full annual benchmark protocol",
+  "dispatch_sha256": "5b245bdb144aad5e419fdc207f36009ddc1a61e8491fb45eb7c89081cd7ea8ac",
+  "verified": true
+}

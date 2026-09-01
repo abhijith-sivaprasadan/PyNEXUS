@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pynexus-energy"
 version = "0.1.0"
-description = "Pyomo model for offshore-wind, PEM-electrolyser, and hydrogen-pipeline dispatch"
+description = "Pyomo model coupling electricity, hydrogen, and heat dispatch: offshore-wind, PEM-electrolyser, hydrogen storage/pipeline, grid exchange, and heat recovery"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",

@@ -1,0 +1,92 @@
+{
+  "calendar_check": {
+    "actual_hours": 48,
+    "dst_transition_in_range": false,
+    "expected_hours": 48,
+    "leap_day_in_range": false,
+    "no_duplicates": true,
+    "no_gaps": true
+  },
+  "cds_request": {
+    "area": [
+      52.75,
+      3.25,
+      52.25,
+      3.75
+    ],
+    "day": [
+      "01",
+      "02"
+    ],
+    "format": "netcdf",
+    "month": [
+      "06"
+    ],
+    "product_type": "reanalysis",
+    "time": [
+      "00:00",
+      "01:00",
+      "02:00",
+      "03:00",
+      "04:00",
+      "05:00",
+      "06:00",
+      "07:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
+      "21:00",
+      "22:00",
+      "23:00"
+    ],
+    "variable": [
+      "10m_u_component_of_wind",
+      "10m_v_component_of_wind",
+      "100m_u_component_of_wind",
+      "100m_v_component_of_wind"
+    ],
+    "year": [
+      "2023"
+    ]
+  },
+  "extra": {
+    "expver_values": [
+      "0001"
+    ]
+  },
+  "file_sha256": "ebab78125598acf01eb1d2fa147ca4ef11707c8c5d44c6663b9d98c11d53d195",
+  "retrieval_timestamp": "2026-09-01T01:54:08.443271+00:00",
+  "row_count": {
+    "actual": 48,
+    "expected": 48
+  },
+  "schema_version": 1,
+  "source": "ERA5 reanalysis-era5-single-levels (hourly)",
+  "spatial_point": {
+    "grid_cell_center_latitude": 52.5,
+    "grid_cell_center_longitude": 3.5,
+    "requested_latitude": 52.5,
+    "requested_longitude": 3.5
+  },
+  "temporal_range": {
+    "end": "2023-06-02",
+    "start": "2023-06-01",
+    "timezone": "Europe/Amsterdam"
+  },
+  "variables": [
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "100m_u_component_of_wind",
+    "100m_v_component_of_wind"
+  ]
+}

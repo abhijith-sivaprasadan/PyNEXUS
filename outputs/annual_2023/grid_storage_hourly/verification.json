@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "absolute_tolerance": 1e-05,
+  "relative_identity_tolerance": 1e-08,
+  "checks": {
+    "finite_results": true,
+    "nonnegativity": true,
+    "binary_linkage": true,
+    "electrolyser_bounds": true,
+    "ramps": true,
+    "pipeline_capacity": true,
+    "hydrogen_identity": true,
+    "grid_balance": true,
+    "grid_connection_limit": true,
+    "cost_identity": true,
+    "storage_balance": true,
+    "storage_terminal": true,
+    "storage_charge_limit": true,
+    "demand_balance": true,
+    "objective_recomputed": true
+  },
+  "cost_objective": 2943976563.2821946,
+  "emissions_objective": 3096892247.2946506
+}

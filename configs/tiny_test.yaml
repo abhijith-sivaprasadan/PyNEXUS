@@ -9,6 +9,7 @@ electrolyzer:
   ramp_rate_per_hour: 0.40
   hydrogen_output_pressure_bar: 30.0
   degradation_rate_per_year: 0.005
+  recoverable_heat_fraction: 0.5
 wind_turbine:
   rated_power_mw: 15.0
   n_turbines: 2
@@ -29,6 +30,29 @@ pipeline:
   max_flow_kg_per_s: 2.0
 hydrogen_demand:
   daily_average_kg: 50000
+hydrogen_storage:
+  capacity_kg: 20000
+  max_charge_rate_kg_h: 2200
+  max_discharge_rate_kg_h: 2200
+  initial_level_kg: 10000
+  final_level_min_kg: 10000
+  loss_fraction_per_hour: 0.0001
+grid:
+  connection_capacity_mw: 50.0
+heat_storage:
+  capacity_mwh_th: 50.0
+  max_charge_rate_mw_th: 10.0
+  max_discharge_rate_mw_th: 10.0
+  initial_level_mwh_th: 25.0
+  final_level_min_mwh_th: 25.0
+  loss_fraction_per_hour: 0.01
+boiler:
+  max_output_mw_th: 20.0
+  fuel_cost_eur_per_mwh_th: 40.0
+  emission_factor_kg_co2_per_mwh_th: 200.0
+economics:
+  hydrogen_value_per_kg: 4.0
+  heat_value_per_mwh: 30.0
 optimization:
   solver: highs
   time_limit_seconds: 60

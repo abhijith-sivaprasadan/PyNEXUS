@@ -139,6 +139,72 @@ class ElectrolyzerDispatchOptimizer:
 
         self.DEMAND_PENALTY = 1000.0  # EUR per kg unmet H2
 
+        # --- Hydrogen storage (Phase A1, opt-in via optimize(enable_storage=True)) ---
+        hs = cfg.get("hydrogen_storage", {})
+        self.storage_capacity_kg = hs.get("capacity_kg", 0.0)
+        self.storage_max_charge_kg_h = hs.get("max_charge_rate_kg_h", 0.0)
+        self.storage_max_discharge_kg_h = hs.get("max_discharge_rate_kg_h", 0.0)
+        self.storage_initial_kg = hs.get("initial_level_kg", 0.0)
+        self.storage_final_min_kg = hs.get("final_level_min_kg", self.storage_initial_kg)
+        # Fractional loss per hour of stored inventory (boil-off/leakage). Compressed
+        # gaseous H2 storage: near-zero: liquid H2 cryogenic boil-off: ~0.1-1%/day
+        # (~0.004-0.04%/h). Default assumes compressed gas (this repo's pipeline
+        # outlet pressure is 30 bar, gaseous, not cryogenic) — see docs/assumptions.md.
+        self.storage_loss_fraction_per_hour = hs.get("loss_fraction_per_hour", 0.0)
+
+        # --- Grid import/export (Phase A2, opt-in via optimize(enable_grid=True)) ---
+        g = cfg.get("grid", {})
+        self.grid_connection_mw = g.get("connection_capacity_mw", 0.0)
+        # Exported power displaces grid generation, which could be credited as
+        # avoided emissions in the emissions objective. This model does NOT
+        # credit it (see docs/formulation.md): grid displacement factors are
+        # controversial/context-dependent (marginal vs. average generation mix)
+        # and crediting them without a sourced marginal-emissions factor would
+        # be exactly the kind of unsourced number this repo's honesty rules
+        # forbid. Only import emissions are counted.
+        self.credit_export_emissions = False
+
+        # --- Heat coupling (Phase B1-B3, opt-in via optimize(enable_heat=True)) ---
+        # Fraction of the electrolyser's rejected energy (p*(1-eta)) that is
+        # actually recoverable at useful temperature. PEM stack coolant is
+        # typically 50-80 C, which suits district heating or low-temperature
+        # industrial demand, NOT high-grade process heat — this is a stated
+        # assumption/range, not a sourced figure for a specific stack design.
+        self.recoverable_heat_fraction = e.get("recoverable_heat_fraction", 0.5)
+        # The linearised electrolyser efficiency implied by h2_coeff, i.e. the
+        # SAME efficiency the MILP's hydrogen output already assumes (nominal
+        # 80% load point) — waste heat must use this, not the full nonlinear
+        # efficiency_at_load() curve from components/electrolyzer.py, or the
+        # energy balance p = h2_power + waste_heat would not close within the
+        # optimizer's own (already-linearised) hydrogen accounting.
+        self.eta_linearized = self.h2_coeff * LHV_HYDROGEN_KWH_PER_KG / 1000.0
+
+        hst = cfg.get("heat_storage", {})
+        self.heat_storage_capacity_mwh = hst.get("capacity_mwh_th", 0.0)
+        self.heat_storage_max_charge_mw = hst.get("max_charge_rate_mw_th", 0.0)
+        self.heat_storage_max_discharge_mw = hst.get("max_discharge_rate_mw_th", 0.0)
+        self.heat_storage_initial_mwh = hst.get("initial_level_mwh_th", 0.0)
+        self.heat_storage_final_min_mwh = hst.get("final_level_min_mwh_th", self.heat_storage_initial_mwh)
+        # Standing thermal losses (insulated hot-water/thermal store): a
+        # stated illustrative range, not a vessel-specific measurement.
+        self.heat_storage_loss_fraction_per_hour = hst.get("loss_fraction_per_hour", 0.0)
+
+        b = cfg.get("boiler", {})
+        self.boiler_max_output_mw = b.get("max_output_mw_th", 0.0)
+        self.boiler_fuel_cost_eur_per_mwh = b.get("fuel_cost_eur_per_mwh_th", 0.0)
+        self.boiler_emission_factor_kg_co2_per_mwh = b.get("emission_factor_kg_co2_per_mwh_th", 0.0)
+
+        econ = cfg.get("economics", {})
+        # Both illustrative EUR values, not sourced offtake contracts — see
+        # docs/assumptions.md. Only used when enable_heat=True, which turns
+        # the cost objective from "minimise cost of meeting fixed demand"
+        # into "minimise net cost after valuing both delivered outputs" —
+        # documented explicitly in docs/formulation.md since this is a
+        # deliberate, consequential modelling choice, not a detail.
+        self.hydrogen_value_per_kg = econ.get("hydrogen_value_per_kg", 0.0)
+        self.heat_value_per_mwh = econ.get("heat_value_per_mwh", 0.0)
+        self.HEAT_DEMAND_PENALTY = 1000.0  # EUR per MWh-th unmet, mirrors DEMAND_PENALTY
+
     def optimize(
         self,
         wind_power_mw: np.ndarray,
@@ -146,6 +212,10 @@ class ElectrolyzerDispatchOptimizer:
         objective: str = "minimize_cost",
         demand_mode: str = "cumulative",
         carbon_intensity: np.ndarray = None,
+        enable_storage: bool = False,
+        enable_grid: bool = False,
+        enable_heat: bool = False,
+        heat_demand_mw: np.ndarray = None,
     ) -> dict:
         """
         Run MILP optimization.
@@ -162,6 +232,27 @@ class ElectrolyzerDispatchOptimizer:
             "hourly" (soft per-hour) or "cumulative" (hard total)
         carbon_intensity : np.ndarray, optional
             Required for emissions objective (kg CO2/MWh).
+        enable_storage : bool
+            Add hydrogen storage (s/h_in/h_out, terminal condition). Default
+            False preserves the exact pre-Phase-A model and its locked
+            reference objective values (docs/reproducibility.md). Only
+            meaningful in combination with demand_mode="hourly" — see
+            docs/formulation.md.
+        enable_grid : bool
+            Add grid import/export against `grid.connection_capacity_mw`.
+            Default False preserves the exact pre-Phase-A model.
+        enable_heat : bool
+            Add electrolyser waste-heat recovery, heat storage, backup
+            boiler, and heat demand, and switch the cost objective to value
+            hydrogen and heat delivered rather than only penalise shortfall
+            — see docs/formulation.md's Phase B section; this is a real
+            change in what the objective represents, not a minor addition.
+            Requires `heat_demand_mw`. Only affects `objective="minimize_cost"`
+            (the emissions objective is unchanged when heat is enabled,
+            other than counting boiler emissions).
+        heat_demand_mw : np.ndarray, optional
+            Required when enable_heat=True: thermal demand (MW-th) at each
+            timestep, same length as wind_power_mw.
 
         Returns
         -------
@@ -191,6 +282,12 @@ class ElectrolyzerDispatchOptimizer:
             carbon_intensity = vector(carbon_intensity, "carbon_intensity")
             if len(carbon_intensity) != T or (carbon_intensity < 0).any():
                 raise ValueError("carbon_intensity must match horizon and be non-negative")
+        if enable_heat:
+            if heat_demand_mw is None:
+                raise ValueError("enable_heat requires heat_demand_mw")
+            heat_demand_mw = vector(heat_demand_mw, "heat_demand_mw")
+            if len(heat_demand_mw) != T or (heat_demand_mw < 0).any():
+                raise ValueError("heat_demand_mw must match horizon and be non-negative")
 
         model = pyo.ConcreteModel(name="ElectrolyzerDispatch")
         model.T = pyo.RangeSet(0, T - 1)
@@ -210,11 +307,25 @@ class ElectrolyzerDispatchOptimizer:
         # Named 'demand_slack' NOT 'slack' — avoid Pyomo 6.10.0 appsi bug
         model.demand_slack = pyo.Var(model.T, domain=pyo.NonNegativeReals)
 
-        # Constraints
-        def wind_limit(model, t):
-            return model.p[t] <= model.wind[t]
+        if enable_grid:
+            if self.grid_connection_mw <= 0:
+                raise ValueError("enable_grid requires grid.connection_capacity_mw > 0 in config")
+            model.g_imp = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw))
+            model.g_exp = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw))
+            model.curtail = pyo.Var(model.T, domain=pyo.NonNegativeReals)
 
-        model.c_wind = pyo.Constraint(model.T, rule=wind_limit)
+            def grid_balance(model, t):
+                # sources = sinks: wind + import = electrolyser load + export + curtailment.
+                # Replaces the plain wind_limit constraint used when grid is disabled.
+                return model.wind[t] + model.g_imp[t] == model.p[t] + model.g_exp[t] + model.curtail[t]
+
+            model.c_grid_balance = pyo.Constraint(model.T, rule=grid_balance)
+        else:
+
+            def wind_limit(model, t):
+                return model.p[t] <= model.wind[t]
+
+            model.c_wind = pyo.Constraint(model.T, rule=wind_limit)
 
         def min_load(model, t):
             return model.p[t] >= self.p_min * model.u[t]
@@ -247,10 +358,123 @@ class ElectrolyzerDispatchOptimizer:
 
         model.c_pipeline = pyo.Constraint(model.T, rule=pipeline_cap)
 
+        if enable_storage:
+            if self.storage_capacity_kg <= 0:
+                raise ValueError("enable_storage requires hydrogen_storage.capacity_kg > 0 in config")
+            model.s = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_capacity_kg))
+            model.h_in = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_max_charge_kg_h)
+            )
+            model.h_out = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_max_discharge_kg_h)
+            )
+
+            def storage_charge_limit(model, t):
+                # Can't divert more hydrogen to storage than was actually produced.
+                return model.h_in[t] <= model.p[t] * self.h2_coeff
+
+            model.c_storage_charge_limit = pyo.Constraint(model.T, rule=storage_charge_limit)
+
+            def storage_balance(model, t):
+                previous = self.storage_initial_kg if t == 0 else model.s[t - 1]
+                loss = self.storage_loss_fraction_per_hour * previous * self.dt
+                return model.s[t] == previous + (model.h_in[t] - model.h_out[t]) * self.dt - loss
+
+            model.c_storage_balance = pyo.Constraint(model.T, rule=storage_balance)
+
+            # Terminal condition: without this the optimiser empties the store on
+            # the last timestep (free energy with no penalty for leaving it
+            # depleted), which is a classic storage-model artefact.
+            def storage_terminal(model):
+                return model.s[T - 1] >= self.storage_final_min_kg
+
+            model.c_storage_terminal = pyo.Constraint(rule=storage_terminal)
+
+        if enable_heat:
+            if self.boiler_max_output_mw <= 0:
+                raise ValueError("enable_heat requires boiler.max_output_mw_th > 0 in config")
+            model.heat_demand = pyo.Param(
+                model.T, initialize={t: float(heat_demand_mw[t]) for t in range(T)}
+            )
+            # Waste heat is a deterministic function of p[t], not a free variable:
+            # everything the electrolyser doesn't convert to hydrogen (at the
+            # SAME linearised efficiency the MILP's hydrogen output already
+            # assumes) is rejected as heat, of which only a stated fraction is
+            # recoverable at useful temperature.
+            model.q_wh = pyo.Expression(
+                model.T,
+                rule=lambda model, t: model.p[t]
+                * (1 - self.eta_linearized)
+                * self.recoverable_heat_fraction,
+            )
+            model.q_boiler = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.boiler_max_output_mw)
+            )
+            model.q_dump = pyo.Var(model.T, domain=pyo.NonNegativeReals)
+            model.heat_slack = pyo.Var(model.T, domain=pyo.NonNegativeReals)
+
+            if self.heat_storage_capacity_mwh > 0:
+                model.e_hs = pyo.Var(
+                    model.T, domain=pyo.NonNegativeReals, bounds=(0, self.heat_storage_capacity_mwh)
+                )
+                model.q_hs_in = pyo.Var(
+                    model.T, domain=pyo.NonNegativeReals, bounds=(0, self.heat_storage_max_charge_mw)
+                )
+                model.q_hs_out = pyo.Var(
+                    model.T,
+                    domain=pyo.NonNegativeReals,
+                    bounds=(0, self.heat_storage_max_discharge_mw),
+                )
+
+                def heat_storage_balance(model, t):
+                    previous = self.heat_storage_initial_mwh if t == 0 else model.e_hs[t - 1]
+                    loss = self.heat_storage_loss_fraction_per_hour * previous * self.dt
+                    return (
+                        model.e_hs[t]
+                        == previous + (model.q_hs_in[t] - model.q_hs_out[t]) * self.dt - loss
+                    )
+
+                model.c_heat_storage_balance = pyo.Constraint(model.T, rule=heat_storage_balance)
+
+                def heat_storage_terminal(model):
+                    return model.e_hs[T - 1] >= self.heat_storage_final_min_mwh
+
+                model.c_heat_storage_terminal = pyo.Constraint(rule=heat_storage_terminal)
+
+            else:
+                # No heat storage configured: charge/discharge are fixed at zero
+                # rather than omitted, so the balance below can reference them
+                # unconditionally regardless of whether storage is sized.
+                model.q_hs_in = pyo.Param(model.T, initialize=0.0)
+                model.q_hs_out = pyo.Param(model.T, initialize=0.0)
+
+            def heat_charge_limit(model, t):
+                # Can't divert more heat to storage+dump than was actually
+                # recovered — mirrors c_storage_charge_limit for hydrogen.
+                return model.q_hs_in[t] + model.q_dump[t] <= model.q_wh[t]
+
+            model.c_heat_charge_limit = pyo.Constraint(model.T, rule=heat_charge_limit)
+
+            def heat_balance(model, t):
+                # Recovered heat, net of what's diverted to storage or dumped,
+                # plus storage withdrawal and boiler backup, must cover demand
+                # (soft: heat_slack absorbs any shortfall) — same pattern as
+                # the hydrogen demand balance with storage enabled.
+                delivered = model.q_wh[t] - model.q_hs_in[t] - model.q_dump[t]
+                return (
+                    delivered + model.q_hs_out[t] + model.q_boiler[t] + model.heat_slack[t]
+                    >= model.heat_demand[t]
+                )
+
+            model.c_heat_balance = pyo.Constraint(model.T, rule=heat_balance)
+
         if demand_mode == "hourly":
 
             def h2_demand_hourly(model, t):
-                return model.p[t] * self.h2_coeff + model.demand_slack[t] >= model.demand_kg
+                produced = model.p[t] * self.h2_coeff
+                if enable_storage:
+                    produced = produced - model.h_in[t] + model.h_out[t]
+                return produced + model.demand_slack[t] >= model.demand_kg
 
             model.c_demand = pyo.Constraint(model.T, rule=h2_demand_hourly)
         elif demand_mode == "cumulative":
@@ -265,9 +489,41 @@ class ElectrolyzerDispatchOptimizer:
         if objective == "minimize_cost":
 
             def cost_obj(model):
-                return sum(model.price[t] * model.p[t] * self.dt for t in model.T) + sum(
+                terms = sum(model.price[t] * model.p[t] * self.dt for t in model.T) + sum(
                     self.DEMAND_PENALTY * model.demand_slack[t] * self.dt for t in model.T
                 )
+                if enable_grid:
+                    terms += sum(model.price[t] * model.g_imp[t] * self.dt for t in model.T)
+                    terms -= sum(model.price[t] * model.g_exp[t] * self.dt for t in model.T)
+                if enable_heat:
+                    # Coupled objective (Phase B3): boiler fuel cost and
+                    # heat-shortfall penalty are added; hydrogen and heat
+                    # VALUE are subtracted, turning this from "minimise cost
+                    # of meeting a fixed demand" into "minimise net cost
+                    # after valuing both delivered outputs". See
+                    # docs/formulation.md for why this weighting choice is
+                    # made explicit rather than left implicit.
+                    terms += sum(
+                        self.boiler_fuel_cost_eur_per_mwh * model.q_boiler[t] * self.dt
+                        for t in model.T
+                    )
+                    terms += sum(
+                        self.HEAT_DEMAND_PENALTY * model.heat_slack[t] * self.dt for t in model.T
+                    )
+                    h2_delivered = sum(model.p[t] * self.h2_coeff * self.dt for t in model.T)
+                    if enable_storage:
+                        h2_delivered = sum(
+                            (model.p[t] * self.h2_coeff - model.h_in[t] + model.h_out[t]) * self.dt
+                            for t in model.T
+                        )
+                    terms -= self.hydrogen_value_per_kg * h2_delivered
+                    heat_delivered = sum(
+                        (model.q_wh[t] - model.q_hs_in[t] - model.q_dump[t] + model.q_hs_out[t])
+                        * self.dt
+                        for t in model.T
+                    )
+                    terms -= self.heat_value_per_mwh * heat_delivered
+                return terms
 
             model.objective = pyo.Objective(rule=cost_obj, sense=pyo.minimize)
 
@@ -279,9 +535,23 @@ class ElectrolyzerDispatchOptimizer:
             )
 
             def emissions_obj(model):
-                return sum(model.carbon[t] * model.p[t] * self.dt for t in model.T) + sum(
+                terms = sum(model.carbon[t] * model.p[t] * self.dt for t in model.T) + sum(
                     self.DEMAND_PENALTY * model.demand_slack[t] * self.dt for t in model.T
                 )
+                if enable_grid:
+                    # Import carries grid carbon intensity. Export is NOT credited
+                    # as avoided emissions — see self.credit_export_emissions and
+                    # docs/formulation.md for why.
+                    terms += sum(model.carbon[t] * model.g_imp[t] * self.dt for t in model.T)
+                if enable_heat:
+                    terms += sum(
+                        self.boiler_emission_factor_kg_co2_per_mwh * model.q_boiler[t] * self.dt
+                        for t in model.T
+                    )
+                    terms += sum(
+                        self.HEAT_DEMAND_PENALTY * model.heat_slack[t] * self.dt for t in model.T
+                    )
+                return terms
 
             model.objective = pyo.Objective(rule=emissions_obj, sense=pyo.minimize)
         else:
@@ -328,11 +598,22 @@ class ElectrolyzerDispatchOptimizer:
         cost_profile = electricity_prices * power_schedule * self.dt
         demand_met_bool = h2_produced_kg_h >= self.hourly_demand_kg - 1e-3
 
+        if enable_grid:
+            curtailment_mw = np.array([pyo.value(model.curtail[t]) for t in range(T)])
+            grid_import_mw = np.array([pyo.value(model.g_imp[t]) for t in range(T)])
+            grid_export_mw = np.array([pyo.value(model.g_exp[t]) for t in range(T)])
+            cost_profile = cost_profile + electricity_prices * grid_import_mw * self.dt
+            cost_profile = cost_profile - electricity_prices * grid_export_mw * self.dt
+        else:
+            curtailment_mw = wind_power_mw - power_schedule
+            grid_import_mw = np.zeros(T)
+            grid_export_mw = np.zeros(T)
+
         results_df = pd.DataFrame(
             {
                 "timestep": np.arange(T),
                 "wind_available_mw": wind_power_mw,
-                "curtailment_mw": wind_power_mw - power_schedule,
+                "curtailment_mw": curtailment_mw,
                 "power_optimized_mw": power_schedule,
                 "online_status": online_status.astype(int),
                 "electricity_price": electricity_prices,
@@ -341,8 +622,27 @@ class ElectrolyzerDispatchOptimizer:
                 "demand_slack_kg_h": slack_values,
                 "demand_met": demand_met_bool,
                 "cost_eur": cost_profile,
+                "grid_import_mw": grid_import_mw,
+                "grid_export_mw": grid_export_mw,
             }
         )
+        if enable_storage:
+            results_df["storage_level_kg"] = [pyo.value(model.s[t]) for t in range(T)]
+            results_df["storage_charge_kg_h"] = [pyo.value(model.h_in[t]) for t in range(T)]
+            results_df["storage_discharge_kg_h"] = [pyo.value(model.h_out[t]) for t in range(T)]
+
+        if enable_heat:
+            results_df["heat_demand_mw"] = heat_demand_mw
+            results_df["waste_heat_recovered_mw"] = [pyo.value(model.q_wh[t]) for t in range(T)]
+            results_df["boiler_output_mw"] = [pyo.value(model.q_boiler[t]) for t in range(T)]
+            results_df["heat_dumped_mw"] = [pyo.value(model.q_dump[t]) for t in range(T)]
+            results_df["heat_slack_mw"] = [pyo.value(model.heat_slack[t]) for t in range(T)]
+            if self.heat_storage_capacity_mwh > 0:
+                results_df["heat_storage_level_mwh"] = [pyo.value(model.e_hs[t]) for t in range(T)]
+                results_df["heat_storage_charge_mw"] = [pyo.value(model.q_hs_in[t]) for t in range(T)]
+                results_df["heat_storage_discharge_mw"] = [
+                    pyo.value(model.q_hs_out[t]) for t in range(T)
+                ]
 
         return {
             **metadata,
@@ -354,6 +654,9 @@ class ElectrolyzerDispatchOptimizer:
             "cost_profile": cost_profile,
             "slack_values": slack_values,
             "results_df": results_df,
+            "enable_storage": enable_storage,
+            "enable_grid": enable_grid,
+            "enable_heat": enable_heat,
         }
 
     def print_solution_summary(self, result: dict):
