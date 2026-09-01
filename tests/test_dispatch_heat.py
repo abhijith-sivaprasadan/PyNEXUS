@@ -34,9 +34,7 @@ def test_enable_heat_without_boiler_config_is_rejected(tmp_path) -> None:
     opt = ElectrolyzerDispatchOptimizer(str(path))
 
     with pytest.raises(ValueError, match="max_output_mw_th"):
-        opt.optimize(
-            [100.0], [10.0], demand_mode="hourly", enable_heat=True, heat_demand_mw=[5.0]
-        )
+        opt.optimize([100.0], [10.0], demand_mode="hourly", enable_heat=True, heat_demand_mw=[5.0])
 
 
 def test_waste_heat_never_exceeds_electrolyser_thermal_rejection() -> None:
@@ -98,9 +96,7 @@ def test_heat_storage_soc_closes_over_the_horizon() -> None:
     )
     loss = opt.heat_storage_loss_fraction_per_hour * e_prev * opt.dt
     expected = (
-        e_prev
-        + (df["heat_storage_charge_mw"] - df["heat_storage_discharge_mw"]) * opt.dt
-        - loss
+        e_prev + (df["heat_storage_charge_mw"] - df["heat_storage_discharge_mw"]) * opt.dt - loss
     )
     assert df["heat_storage_level_mwh"].to_numpy() == pytest.approx(expected.to_numpy(), abs=1e-6)
     assert df["heat_storage_level_mwh"].iloc[-1] >= opt.heat_storage_final_min_mwh - 1e-6
@@ -146,9 +142,7 @@ def test_coupled_objective_independently_reconstructed() -> None:
 
     electricity_cost = (df["power_optimized_mw"] * df["electricity_price"] * opt.dt).sum()
     demand_penalty = opt.DEMAND_PENALTY * df["demand_slack_kg_h"].sum() * opt.dt
-    boiler_cost = (
-        opt.boiler_fuel_cost_eur_per_mwh * df["boiler_output_mw"] * opt.dt
-    ).sum()
+    boiler_cost = (opt.boiler_fuel_cost_eur_per_mwh * df["boiler_output_mw"] * opt.dt).sum()
     heat_penalty = opt.HEAT_DEMAND_PENALTY * df["heat_slack_mw"].sum() * opt.dt
     h2_value = opt.hydrogen_value_per_kg * (df["h2_produced_kg_h"] * opt.dt).sum()
     heat_delivered = (

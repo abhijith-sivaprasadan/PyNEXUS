@@ -86,7 +86,12 @@ def test_fetch_era5_wires_arguments_through(monkeypatch, tmp_path, capsys):
     )
 
     assert exit_code == 0
-    assert calls["args"] == ("2023-01-01", "2023-01-02", str(tmp_path / "raw"), str(tmp_path / "prov"))
+    assert calls["args"] == (
+        "2023-01-01",
+        "2023-01-02",
+        str(tmp_path / "raw"),
+        str(tmp_path / "prov"),
+    )
     printed = json.loads(capsys.readouterr().out)
     assert printed["file_sha256"] == "deadbeef"
     assert printed["rows"] == 48

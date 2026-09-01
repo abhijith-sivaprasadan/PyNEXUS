@@ -57,9 +57,7 @@ def test_combined_hydrogen_balance_holds(combined_result) -> None:
         - df["storage_charge_kg_h"]
         + df["storage_discharge_kg_h"]
     )
-    assert (
-        (produced + df["demand_slack_kg_h"]).to_numpy() >= opt.hourly_demand_kg - 1e-4
-    ).all()
+    assert ((produced + df["demand_slack_kg_h"]).to_numpy() >= opt.hourly_demand_kg - 1e-4).all()
 
 
 def test_combined_hydrogen_storage_recursion_and_terminal_condition(combined_result) -> None:

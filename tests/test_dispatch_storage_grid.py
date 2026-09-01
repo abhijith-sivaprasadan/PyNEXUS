@@ -76,9 +76,7 @@ def test_zero_production_with_lossy_storage_and_a_floor_is_correctly_infeasible(
     nonzero boil-off loss is a genuine infeasibility, not a solver or model bug.
     This is the failure mode a fail-loud model should surface, not paper over."""
     opt = ElectrolyzerDispatchOptimizer(CONFIG)
-    result = opt.optimize(
-        [0.0, 0.0], [10.0, 10.0], demand_mode="hourly", enable_storage=True
-    )
+    result = opt.optimize([0.0, 0.0], [10.0, 10.0], demand_mode="hourly", enable_storage=True)
     assert result["status"] == "infeasible"
     assert result["results_df"] is None
 

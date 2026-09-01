@@ -48,7 +48,11 @@ def test_shear_correction_is_vectorised() -> None:
 
 def test_build_cds_request_structure() -> None:
     request = build_cds_request(
-        latitude=52.5, longitude=3.5, grid_resolution=0.25, start_date="2023-01-01", end_date="2023-01-02"
+        latitude=52.5,
+        longitude=3.5,
+        grid_resolution=0.25,
+        start_date="2023-01-01",
+        end_date="2023-01-02",
     )
     assert set(request["variable"]) == {
         "10m_u_component_of_wind",

@@ -184,7 +184,9 @@ class ElectrolyzerDispatchOptimizer:
         self.heat_storage_max_charge_mw = hst.get("max_charge_rate_mw_th", 0.0)
         self.heat_storage_max_discharge_mw = hst.get("max_discharge_rate_mw_th", 0.0)
         self.heat_storage_initial_mwh = hst.get("initial_level_mwh_th", 0.0)
-        self.heat_storage_final_min_mwh = hst.get("final_level_min_mwh_th", self.heat_storage_initial_mwh)
+        self.heat_storage_final_min_mwh = hst.get(
+            "final_level_min_mwh_th", self.heat_storage_initial_mwh
+        )
         # Standing thermal losses (insulated hot-water/thermal store): a
         # stated illustrative range, not a vessel-specific measurement.
         self.heat_storage_loss_fraction_per_hour = hst.get("loss_fraction_per_hour", 0.0)
@@ -310,14 +312,20 @@ class ElectrolyzerDispatchOptimizer:
         if enable_grid:
             if self.grid_connection_mw <= 0:
                 raise ValueError("enable_grid requires grid.connection_capacity_mw > 0 in config")
-            model.g_imp = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw))
-            model.g_exp = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw))
+            model.g_imp = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw)
+            )
+            model.g_exp = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.grid_connection_mw)
+            )
             model.curtail = pyo.Var(model.T, domain=pyo.NonNegativeReals)
 
             def grid_balance(model, t):
                 # sources = sinks: wind + import = electrolyser load + export + curtailment.
                 # Replaces the plain wind_limit constraint used when grid is disabled.
-                return model.wind[t] + model.g_imp[t] == model.p[t] + model.g_exp[t] + model.curtail[t]
+                return (
+                    model.wind[t] + model.g_imp[t] == model.p[t] + model.g_exp[t] + model.curtail[t]
+                )
 
             model.c_grid_balance = pyo.Constraint(model.T, rule=grid_balance)
         else:
@@ -360,8 +368,12 @@ class ElectrolyzerDispatchOptimizer:
 
         if enable_storage:
             if self.storage_capacity_kg <= 0:
-                raise ValueError("enable_storage requires hydrogen_storage.capacity_kg > 0 in config")
-            model.s = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_capacity_kg))
+                raise ValueError(
+                    "enable_storage requires hydrogen_storage.capacity_kg > 0 in config"
+                )
+            model.s = pyo.Var(
+                model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_capacity_kg)
+            )
             model.h_in = pyo.Var(
                 model.T, domain=pyo.NonNegativeReals, bounds=(0, self.storage_max_charge_kg_h)
             )
@@ -403,9 +415,9 @@ class ElectrolyzerDispatchOptimizer:
             # recoverable at useful temperature.
             model.q_wh = pyo.Expression(
                 model.T,
-                rule=lambda model, t: model.p[t]
-                * (1 - self.eta_linearized)
-                * self.recoverable_heat_fraction,
+                rule=lambda model, t: (
+                    model.p[t] * (1 - self.eta_linearized) * self.recoverable_heat_fraction
+                ),
             )
             model.q_boiler = pyo.Var(
                 model.T, domain=pyo.NonNegativeReals, bounds=(0, self.boiler_max_output_mw)
@@ -418,7 +430,9 @@ class ElectrolyzerDispatchOptimizer:
                     model.T, domain=pyo.NonNegativeReals, bounds=(0, self.heat_storage_capacity_mwh)
                 )
                 model.q_hs_in = pyo.Var(
-                    model.T, domain=pyo.NonNegativeReals, bounds=(0, self.heat_storage_max_charge_mw)
+                    model.T,
+                    domain=pyo.NonNegativeReals,
+                    bounds=(0, self.heat_storage_max_charge_mw),
                 )
                 model.q_hs_out = pyo.Var(
                     model.T,
@@ -639,7 +653,9 @@ class ElectrolyzerDispatchOptimizer:
             results_df["heat_slack_mw"] = [pyo.value(model.heat_slack[t]) for t in range(T)]
             if self.heat_storage_capacity_mwh > 0:
                 results_df["heat_storage_level_mwh"] = [pyo.value(model.e_hs[t]) for t in range(T)]
-                results_df["heat_storage_charge_mw"] = [pyo.value(model.q_hs_in[t]) for t in range(T)]
+                results_df["heat_storage_charge_mw"] = [
+                    pyo.value(model.q_hs_in[t]) for t in range(T)
+                ]
                 results_df["heat_storage_discharge_mw"] = [
                     pyo.value(model.q_hs_out[t]) for t in range(T)
                 ]

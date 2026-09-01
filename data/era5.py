@@ -384,7 +384,9 @@ def load_era5_wind(
     # not-yet-back-filled ERA5T ("0005") data. ERA5T values can be revised
     # after the fact, so this matters for anyone re-running the same request
     # later and getting a (slightly) different answer near the present.
-    expver_values = sorted(set(np.atleast_1d(point["expver"].values))) if "expver" in point.coords else []
+    expver_values = (
+        sorted(set(np.atleast_1d(point["expver"].values))) if "expver" in point.coords else []
+    )
 
     return df, {
         "latitude": nearest_lat,
@@ -406,7 +408,12 @@ def _load_and_record(
     wt = cfg["wind_turbine"]
 
     df, spatial_point = load_era5_wind(
-        nc_path, loc["latitude"], loc["longitude"], cfg["simulation"]["timezone"], start_date, end_date
+        nc_path,
+        loc["latitude"],
+        loc["longitude"],
+        cfg["simulation"]["timezone"],
+        start_date,
+        end_date,
     )
     calendar_check = check_calendar_coverage(
         df.index, start_date, end_date, cfg["simulation"]["timezone"]
@@ -454,7 +461,12 @@ def fetch_and_load(
     """
     loc = cfg["location"]
     nc_path, request = fetch_era5(
-        loc["latitude"], loc["longitude"], loc["era5_grid_resolution"], start_date, end_date, cache_dir
+        loc["latitude"],
+        loc["longitude"],
+        loc["era5_grid_resolution"],
+        start_date,
+        end_date,
+        cache_dir,
     )
     return _load_and_record(cfg, nc_path, request, start_date, end_date, provenance_dir)
 
@@ -498,9 +510,7 @@ def fetch_and_load_year(
 
     summary = {
         "year": year,
-        "monthly_provenance_files": [
-            f"era5_{start}_{end}.json" for _, _, start, end in fetched
-        ],
+        "monthly_provenance_files": [f"era5_{start}_{end}.json" for _, _, start, end in fetched],
         "calendar_check": full_calendar_check,
         "total_rows": len(full_df),
     }

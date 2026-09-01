@@ -297,10 +297,14 @@ def main(argv=None):
     )
     run.add_argument("--demand-mode", choices=["cumulative", "hourly"], default="cumulative")
     run.add_argument(
-        "--enable-storage", action="store_true", help="Phase A1 hydrogen storage (see docs/formulation.md)"
+        "--enable-storage",
+        action="store_true",
+        help="Phase A1 hydrogen storage (see docs/formulation.md)",
     )
     run.add_argument(
-        "--enable-grid", action="store_true", help="Phase A2 grid import/export (see docs/formulation.md)"
+        "--enable-grid",
+        action="store_true",
+        help="Phase A2 grid import/export (see docs/formulation.md)",
     )
     run.add_argument(
         "--enable-heat",

@@ -71,7 +71,9 @@ def check_local_day_coverage(
         freq="1h",
     )
     actual = pd.DatetimeIndex(timestamps)
-    actual = actual.tz_localize(timezone_name) if actual.tz is None else actual.tz_convert(timezone_name)
+    actual = (
+        actual.tz_localize(timezone_name) if actual.tz is None else actual.tz_convert(timezone_name)
+    )
 
     duplicates = actual[actual.duplicated()]
     if len(duplicates) > 0:

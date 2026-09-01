@@ -139,9 +139,7 @@ def verify_dispatch(
         if objective == "minimize_cost":
             cost_objective = cost_objective + boiler_cost + heat_penalty - h2_value - heat_value
         elif emissions_objective is not None:
-            boiler_emissions = (
-                opt.boiler_emission_factor_kg_co2_per_mwh * q_boiler * dt
-            ).sum()
+            boiler_emissions = (opt.boiler_emission_factor_kg_co2_per_mwh * q_boiler * dt).sum()
             emissions_objective = emissions_objective + boiler_emissions + heat_penalty
 
     recomputed = cost_objective if objective == "minimize_cost" else emissions_objective
