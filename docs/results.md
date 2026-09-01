@@ -62,13 +62,19 @@ t = np.arange(T)
 wind = np.clip(25 + 20 * np.sin(2 * np.pi * t / 24) + np.random.normal(0, 12, T), 0, 150)
 price = np.clip(50 + 20 * np.cos(2 * np.pi * t / 24) + np.random.normal(0, 8, T), 5, 150)
 carbon = np.clip(200 + 80 * np.sin(2 * np.pi * t / 24), 50, 400)
-heat_demand = np.clip(12 + 6 * np.cos(2 * np.pi * (t % 24 - 7) / 24) + np.random.normal(0, 1, T), 3, 25)
+heat_demand = np.clip(
+    12 + 6 * np.cos(2 * np.pi * (t % 24 - 7) / 24) + np.random.normal(0, 1, T), 3, 25
+)
 
 for heat_value in [0.0, 30.0, 60.0, 120.0, 250.0, 500.0]:
     opt.heat_value_per_mwh = heat_value
     r = opt.optimize(
-        wind, price, demand_mode="hourly", enable_heat=True,
-        heat_demand_mw=heat_demand, carbon_intensity=carbon,
+        wind,
+        price,
+        demand_mode="hourly",
+        enable_heat=True,
+        heat_demand_mw=heat_demand,
+        carbon_intensity=carbon,
     )
     df = r["results_df"]
     print(heat_value, int(df["online_status"].sum()), float((df["power_optimized_mw"]).sum()))

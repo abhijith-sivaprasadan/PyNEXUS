@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff==0.16.5"]
 data = ["entsoe-py>=0.6", "cdsapi>=0.6", "xarray>=2023.1", "cfgrib>=0.9", "netCDF4>=1.6"]
 
 [project.scripts]
@@ -29,6 +29,13 @@ include = ["assets*", "components*", "optimization*", "data*"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# Markdown formatting is preview/experimental in some ruff versions and
+# stable-by-default in others (this exact drift broke CI once already:
+# local ruff 0.15.4 needs --preview to touch .md at all and silently
+# skipped it, while CI's resolved `ruff>=0.6` version formatted embedded
+# Python code fences in docs/*.md by default). Excluded deterministically
+# rather than relying on preview-mode behaviour matching across versions.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
