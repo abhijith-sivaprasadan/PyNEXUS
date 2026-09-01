@@ -42,6 +42,35 @@ fetches real ERA5 wind from the Copernicus Climate Data Store and writes a
 provenance record; it requires the `[data]` extra and a CDS account (see
 [`docs/data_provenance.md`](docs/data_provenance.md)) and is independent of `solve`/`verify`.
 
+## GUI
+
+`ui/app.py` is a Streamlit GUI over the exact same `ElectrolyzerDispatchOptimizer.optimize` / `verify_dispatch` code path `pynexus solve` / `verify` use — no separate logic, nothing the CLI can't already do.
+
+```bash
+pip install -e ".[ui]"
+streamlit run ui/app.py
+```
+
+**Run dispatch** — configure a run (config, input source, objective, demand mode, Phase A/B toggles) and solve it live, with the same independent verification and a downloadable `dispatch.csv`:
+
+![Run dispatch: configuration and results](docs/screenshots/03_run_dispatch_results.png)
+
+Enabling storage/grid/heat adds their own charts (this is the same run, scrolled down):
+
+![Storage and grid charts](docs/screenshots/04_run_dispatch_storage_grid.png)
+
+**Browse past runs** — load any committed `run_manifest.json`/`dispatch.csv` pair from `outputs/`, including the real annual runs from `docs/reproducibility.md`'s 2026-09-01 section:
+
+![Browsing the real annual grid+storage run](docs/screenshots/06_browse_past_runs.png)
+
+**Capacity factor** — the real ERA5-derived capacity factor (`docs/validation.md`) computed live from `data/raw/era5_2023_wind.csv`:
+
+![Capacity factor from real ERA5 wind](docs/screenshots/07_capacity_factor.png)
+
+**Data reconciliation** — an interactive version of `docs/reconciliation.md`'s WLS + chi-square(1) gross-error test; biasing one sensor here trips the same flag the tests check for:
+
+![A biased sensor tripping the gross-error flag](docs/screenshots/09_reconciliation_gross_error.png)
+
 ## Configuration
 
 `config.yaml` remains the backward-compatible weekly default. `configs/tiny_test.yaml` is a compact deterministic test configuration. `configs/annual.yaml` is the 8,760-hour configuration, added after a complete run with recorded solver status and checked output — see `docs/reproducibility.md`. Its wind-only and grid-only-cumulative variants are genuinely infeasible against real 2023 wind at the configured demand rate; the recorded successful run uses `--enable-grid --enable-storage --demand-mode hourly` and still leaves ~16% of annual demand unmet — a real capacity-planning finding, not a claim that the configured system fully meets its own demand target.
@@ -55,6 +84,7 @@ provenance record; it requires the `[data]` extra and a CDS account (see
 - `docs/validation.md` — capacity-factor sanity check against a published source
 - `docs/results.md` — does heat coupling change dispatch? A tested finding, with figure
 - `docs/verification.md` — deterministic test evidence and validation terminology
+- `ui/app.py` — Streamlit GUI (see [GUI](#gui) above)
 - `tests/` — fast component and optimisation tests
 - [Reproducibility and change evidence](docs/reproducibility.md)
 

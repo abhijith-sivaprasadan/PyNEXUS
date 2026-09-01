@@ -26,5 +26,8 @@ jupyter>=1.0
 ipykernel>=6.0
 tqdm>=4.65            # Progress bars for long data fetches
 
+# GUI
+streamlit>=1.30       # ui/app.py
+
 # Testing
 pytest>=7.4

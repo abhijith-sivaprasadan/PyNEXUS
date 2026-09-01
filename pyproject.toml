@@ -19,12 +19,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff==0.16.5"]
 data = ["entsoe-py>=0.6", "cdsapi>=0.6", "xarray>=2023.1", "cfgrib>=0.9", "netCDF4>=1.6"]
+ui = ["streamlit>=1.30"]
 
 [project.scripts]
 pynexus = "optimization.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["assets*", "components*", "optimization*", "data*"]
+include = ["assets*", "components*", "optimization*", "data*", "ui*"]
 
 [tool.ruff]
 target-version = "py310"
