@@ -18,6 +18,7 @@ entsoe-py>=0.6        # ENTSO-E Transparency Platform API wrapper
 cdsapi>=0.6           # ERA5 climate data (Copernicus)
 xarray>=2023.1        # ERA5 NetCDF handling
 cfgrib>=0.9           # GRIB file support for ERA5
+netCDF4>=1.6          # NetCDF backend for xarray.open_dataset
 
 # Utilities
 pyyaml>=6.0           # config.yaml parsing

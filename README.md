@@ -6,7 +6,7 @@ A reproducible Pyomo/HiGHS model for hourly dispatch of an offshore-wind, PEM-el
 
 The checked-in reference configuration covers 168 hourly timesteps. No 8,760-hour result is claimed. The model includes wind availability, electrolyser minimum/maximum load and ramping, a simplified hydrogen-pipeline capacity constraint, and hydrogen-demand constraints. It is a screening model, not a project-specific engineering design.
 
-Configured ENTSO-E and ERA5 labels describe intended data sources; the present repository does not include an authenticated download workflow. The deterministic examples and tests use synthetic arrays.
+Configured ENTSO-E labels describe an intended data source; the present repository does not include an authenticated ENTSO-E download workflow. ERA5 wind is different: `data/era5.py` implements and unit-tests a real Copernicus Climate Data Store fetch, nearest-grid-cell extraction, hub-height shear correction, and a committed provenance record (`pynexus fetch-era5`) — see [`docs/data_provenance.md`](docs/data_provenance.md). No live ERA5 fetch has been run in this repository, so no committed provenance record from a real download exists yet, and the deterministic examples and tests still use synthetic arrays.
 
 ## Quick start
 
@@ -28,6 +28,11 @@ The legacy `python -m optimization.dispatch` demonstration remains interactive.
 The runner saves the exact config, inputs, dispatch, hashes, environment, solver
 settings/status, model size and independent numerical checks. It rejects an
 existing output directory to prevent stale results after a failed solve.
+
+`pynexus fetch-era5 --config config.yaml --start-date YYYY-MM-DD --end-date YYYY-MM-DD`
+fetches real ERA5 wind from the Copernicus Climate Data Store and writes a
+provenance record; it requires the `[data]` extra and a CDS account (see
+[`docs/data_provenance.md`](docs/data_provenance.md)) and is independent of `solve`/`verify`.
 
 ## Configuration
 

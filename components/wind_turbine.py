@@ -132,13 +132,48 @@ _turbine_power_vec = np.vectorize(
 # --- Core class ---------------------------------------------
 
 
+def load_tabulated_power_curve(csv_path: str):
+    """
+    Load a manufacturer power curve from CSV and return an interpolation
+    callable ``f(wind_speed_ms) -> power_mw`` for a single turbine.
+
+    The CSV must have columns ``wind_speed_ms, power_mw`` and should span the
+    full cut-in-to-cut-out range: real turbine curves are not cubic near
+    rated, which is the reason to support this table instead of always using
+    the analytic cubic approximation. Speeds outside the tabulated range are
+    clamped to the table's first/last power value (0 below cut-in, rated
+    power above cut-out, by convention of how the table is authored).
+
+    Parameters
+    ----------
+    csv_path : str
+        Path to a two-column CSV: wind_speed_ms, power_mw.
+
+    Returns
+    -------
+    callable
+        Vectorised function mapping wind speed (m/s) to single-turbine
+        power (MW), via linear interpolation between tabulated points.
+    """
+    table = pd.read_csv(csv_path)
+    speeds = table["wind_speed_ms"].to_numpy(dtype=float)
+    powers = table["power_mw"].to_numpy(dtype=float)
+    if not np.all(np.diff(speeds) > 0):
+        raise ValueError(f"{csv_path}: wind_speed_ms column must be strictly increasing")
+
+    def _interp(wind_speed_ms):
+        return np.interp(wind_speed_ms, speeds, powers, left=powers[0], right=powers[-1])
+
+    return _interp
+
+
 class OffshoreWindFarm:
     """
     Offshore wind farm model.
 
     Takes wind speed time series (from ERA5) and returns farm-level
     power output after applying hub height correction, wake losses,
-    and availability factor.
+    electrical losses, and availability.
 
     Usage
     -----
@@ -158,37 +193,78 @@ class OffshoreWindFarm:
         self.rated_ms = w["rated_wind_speed_ms"]
         self.cut_out_ms = w["cut_out_wind_speed_ms"]
 
-        # Farm-level correction factors
-        # Wake loss: downstream turbines receive less wind
-        # Typical offshore value: 10-12% (DNV GL / Orsted benchmarks)
-        self.wake_loss_factor = 0.90  # 10% wake loss
+        # Farm-level correction factors. Each is a named, sourced parameter
+        # rather than folded invisibly into the power curve itself.
+        # Wake loss: downstream turbines receive less wind.
+        # Typical offshore value: 10-12% (DNV GL / Orsted benchmarks).
+        self.wake_loss_factor = 1.0 - w.get("wake_loss_fraction", 0.10)
+        # Electrical losses: array cabling, transformers, HVDC/HVAC export.
+        # Typical offshore value: 2-3% (DNV-RP-0164 / grid-connection studies).
+        self.electrical_loss_factor = 1.0 - w.get("electrical_loss_fraction", 0.02)
+        # Availability: accounts for planned/unplanned maintenance downtime.
+        # Modern offshore: ~95% (O&M benchmarks).
+        self.availability = 1.0 - w.get("unavailability_fraction", 0.05)
 
-        # Availability: accounts for maintenance downtime
-        # Modern offshore: ~95% (O&M included)
-        self.availability = 0.95
+        power_curve_model = w.get("power_curve_model", "cubic")
+        if power_curve_model == "tabulated":
+            csv_path = w.get("power_curve_csv")
+            if not csv_path:
+                raise ValueError(
+                    "power_curve_model: 'tabulated' requires wind_turbine.power_curve_csv"
+                )
+            self._single_turbine_curve = load_tabulated_power_curve(csv_path)
+        elif power_curve_model == "cubic":
+            self._single_turbine_curve = self._cubic_curve
+        else:
+            raise ValueError(f"Unknown power_curve_model: {power_curve_model!r}")
+        self.power_curve_model = power_curve_model
 
         # Total rated capacity
         self.farm_rated_mw = self.rated_power_mw * self.n_turbines
 
     # --- Core methods ----------------------------------------
 
+    def _cubic_curve(self, wind_speed_hub_ms):
+        return _turbine_power_vec(
+            wind_speed_ms=wind_speed_hub_ms,
+            cut_in=self.cut_in_ms,
+            rated_speed=self.rated_ms,
+            cut_out=self.cut_out_ms,
+            rated_power_mw=self.rated_power_mw,
+        )
+
+    def _farm_output_from_hub_speed(self, wind_speed_hub_ms: np.ndarray) -> np.ndarray:
+        p_single = self._single_turbine_curve(wind_speed_hub_ms)
+        return (
+            p_single
+            * self.n_turbines
+            * self.wake_loss_factor
+            * self.electrical_loss_factor
+            * self.availability
+        )
+
     def power_output_mw(self, wind_speed_10m: np.ndarray) -> np.ndarray:
         """
-        Farm power output from ERA5 10m wind speed time series.
+        Farm power output from a 10m-reference wind speed time series.
 
         Pipeline:
-          ERA5 wind speed (10m)
+          wind speed (10m)
             → hub height correction (power law)
-            → single turbine power curve (cubic / capped)
+            → single turbine power curve (cubic or tabulated)
             → multiply by n_turbines
-            → apply wake loss factor
-            → apply availability factor
+            → apply wake, electrical, and availability losses
             = farm output (MW)
+
+        This is the demonstration/example path used by the synthetic
+        walkthroughs (`assets/green_hydrogen_asset.py`, the dispatch demo).
+        For real ERA5 data, use `power_output_mw_from_hub_height` instead —
+        ERA5 100m components are corrected to hub height in `data/era5.py`,
+        and re-applying the 10m-based shear here would double-correct.
 
         Parameters
         ----------
         wind_speed_10m : np.ndarray
-            Wind speed at 10m height (m/s) — ERA5 native output
+            Wind speed at 10m height (m/s)
 
         Returns
         -------
@@ -196,23 +272,30 @@ class OffshoreWindFarm:
             Farm-level power output (MW) at each timestep
         """
         wind_speed_10m = np.asarray(wind_speed_10m, dtype=float)
-
-        # Step 1: correct to hub height
         v_hub = wind_speed_at_hub_height(wind_speed_10m, self.hub_height_m)
+        return self._farm_output_from_hub_speed(v_hub)
 
-        # Step 2: single turbine power curve
-        p_single = _turbine_power_vec(
-            wind_speed_ms=v_hub,
-            cut_in=self.cut_in_ms,
-            rated_speed=self.rated_ms,
-            cut_out=self.cut_out_ms,
-            rated_power_mw=self.rated_power_mw,
-        )
+    def power_output_mw_from_hub_height(self, wind_speed_hub_ms: np.ndarray) -> np.ndarray:
+        """
+        Farm power output from a wind speed time series already resolved to
+        hub height (e.g. ERA5 100m components shear-corrected to
+        `hub_height_m` by `data.era5.wind_speed_at_hub_height_from_100m`).
 
-        # Step 3: scale to farm, apply wake and availability
-        p_farm = p_single * self.n_turbines * self.wake_loss_factor * self.availability
+        No further height correction is applied here — that is the whole
+        point of this entry point versus `power_output_mw`.
 
-        return p_farm
+        Parameters
+        ----------
+        wind_speed_hub_ms : np.ndarray
+            Wind speed at `self.hub_height_m` (m/s)
+
+        Returns
+        -------
+        np.ndarray
+            Farm-level power output (MW) at each timestep
+        """
+        wind_speed_hub_ms = np.asarray(wind_speed_hub_ms, dtype=float)
+        return self._farm_output_from_hub_speed(wind_speed_hub_ms)
 
     def capacity_factor(self, wind_speed_10m: np.ndarray) -> float:
         """
@@ -252,15 +335,8 @@ class OffshoreWindFarm:
         wind_speed_10m = np.asarray(wind_speed_10m, dtype=float)
         v_hub = wind_speed_at_hub_height(wind_speed_10m, self.hub_height_m)
 
-        p_single = _turbine_power_vec(
-            wind_speed_ms=v_hub,
-            cut_in=self.cut_in_ms,
-            rated_speed=self.rated_ms,
-            cut_out=self.cut_out_ms,
-            rated_power_mw=self.rated_power_mw,
-        )
-
-        p_farm = p_single * self.n_turbines * self.wake_loss_factor * self.availability
+        p_single = self._single_turbine_curve(v_hub)
+        p_farm = self._farm_output_from_hub_speed(v_hub)
 
         return pd.DataFrame(
             {

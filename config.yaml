@@ -41,7 +41,11 @@ wind_turbine:
   cut_in_wind_speed_ms: 3.0      # Below this: zero output
   rated_wind_speed_ms: 13.0      # Full power above this
   cut_out_wind_speed_ms: 25.0    # Safety shutdown above this
-  power_curve_model: "cubic"     # P ~ v^3 between cut-in and rated
+  power_curve_model: "cubic"     # "cubic" (P ~ v^3) or "tabulated" (see power_curve_csv)
+  power_curve_csv: null          # required if power_curve_model: "tabulated"
+  wake_loss_fraction: 0.10       # downstream turbines see less wind; DNV GL / Orsted benchmarks
+  electrical_loss_fraction: 0.02 # array cabling, transformers, export link; DNV-RP-0164
+  unavailability_fraction: 0.05  # planned/unplanned O&M downtime; modern offshore benchmark
 
 # --- Hydrogen pipeline ---------------------------------------
 # Simplified single pipeline from electrolyzer to demand node

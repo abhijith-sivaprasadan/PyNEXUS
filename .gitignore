@@ -11,3 +11,5 @@ outputs/
 .env
 *.grib
 *.nc
+data/raw/*
+!data/raw/.gitkeep

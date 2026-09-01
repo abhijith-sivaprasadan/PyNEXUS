@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from data.era5 import CoverageError, fetch_and_load
 from optimization.dispatch import ElectrolyzerDispatchOptimizer
 from optimization.verification import verify_dispatch
 
@@ -145,6 +146,29 @@ def solve(args):
     return 0 if evidence["passed"] else 3
 
 
+def fetch_era5_command(args):
+    config_path = Path(args.config).resolve()
+    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    df, record = fetch_and_load(
+        cfg,
+        args.start_date,
+        args.end_date,
+        cache_dir=Path(args.cache_dir),
+        provenance_dir=Path(args.provenance_dir),
+    )
+    print(
+        json.dumps(
+            {
+                "rows": len(df),
+                "provenance_dir": args.provenance_dir,
+                "file_sha256": record.file_sha256,
+                "grid_cell": record.spatial_point,
+            }
+        )
+    )
+    return 0
+
+
 def verify(args):
     out = Path(args.run)
     manifest = json.loads((out / "run_manifest.json").read_text(encoding="utf-8"))
@@ -192,12 +216,22 @@ def main(argv=None):
     run.add_argument("--demand-mode", choices=["cumulative", "hourly"], default="cumulative")
     check = sub.add_parser("verify")
     check.add_argument("--run", required=True)
+    fetch = sub.add_parser("fetch-era5")
+    fetch.add_argument("--config", required=True)
+    fetch.add_argument("--start-date", required=True, help="YYYY-MM-DD")
+    fetch.add_argument("--end-date", required=True, help="YYYY-MM-DD")
+    fetch.add_argument("--cache-dir", default="data/raw")
+    fetch.add_argument("--provenance-dir", default="data/provenance_records")
     args = parser.parse_args(argv)
+    commands = {"solve": solve, "verify": verify, "fetch-era5": fetch_era5_command}
     try:
-        return solve(args) if args.command == "solve" else verify(args)
-    except (ValueError, KeyError, OSError) as exc:
+        return commands[args.command](args)
+    except (ValueError, KeyError, OSError, CoverageError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
+    except ImportError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 4
 
 
 if __name__ == "__main__":
