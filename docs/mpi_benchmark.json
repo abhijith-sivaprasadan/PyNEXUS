@@ -1,0 +1,66 @@
+{
+  "platform": "Windows-10-10.0.26300-SP0",
+  "python": "3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]",
+  "mpi_launcher": "C:\\Program Files\\Microsoft MPI\\Bin\\mpiexec.EXE",
+  "hours": 168,
+  "repeats": 3,
+  "scenario_count": 9,
+  "reference_matches": true,
+  "timing_scope": "process seconds include imports and MPI startup; compute includes model construction, solve and gather",
+  "rows": [
+    {
+      "mode": "serial",
+      "ranks": 1,
+      "process_seconds": [
+        4.867352899993421,
+        5.234136600003694,
+        5.486949999991339
+      ],
+      "compute_seconds": [
+        1.674263199995039,
+        1.9041197000042303,
+        1.929667000003974
+      ],
+      "median_process_seconds": 5.234136600003694,
+      "median_compute_seconds": 1.9041197000042303,
+      "speedup": 1.0,
+      "ideal_speedup": 1
+    },
+    {
+      "mode": "mpi",
+      "ranks": 2,
+      "process_seconds": [
+        5.510129900008906,
+        4.416798000005656,
+        4.275459600001341
+      ],
+      "compute_seconds": [
+        1.273932900003274,
+        0.970589700009441,
+        0.9682723000005353
+      ],
+      "median_process_seconds": 4.416798000005656,
+      "median_compute_seconds": 0.970589700009441,
+      "speedup": 1.1850522935386658,
+      "ideal_speedup": 2
+    },
+    {
+      "mode": "mpi",
+      "ranks": 4,
+      "process_seconds": [
+        4.2213014000008116,
+        4.220915500001865,
+        4.338755599994329
+      ],
+      "compute_seconds": [
+        0.6697624999942491,
+        0.700385100004496,
+        0.6403740999958245
+      ],
+      "median_process_seconds": 4.2213014000008116,
+      "median_compute_seconds": 0.6697624999942491,
+      "speedup": 1.239934348208988,
+      "ideal_speedup": 4
+    }
+  ]
+}

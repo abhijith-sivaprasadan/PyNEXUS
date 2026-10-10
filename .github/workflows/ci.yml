@@ -1,21 +1,31 @@
 name: CI
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
   push:
   pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -28,3 +38,34 @@ jobs:
         run: |
           pynexus solve --config configs/tiny_test.yaml --synthetic --output .ci-output
           pynexus verify --run .ci-output
+
+  mpi:
+    name: MPI scenario equivalence (Linux / Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Open MPI and Python bindings
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin libopenmpi-dev
+          python -m pip install -e '.[dev,mpi]'
+      - name: Solve every scenario standalone
+        run: python -m optimization.scenario_sweep --serial --hours 24 --output mpi-results/serial.json
+      - name: Verify two and four ranks against standalone results
+        run: |
+          mpiexec --oversubscribe -n 2 python -m optimization.scenario_sweep --hours 24 --output mpi-results/ranks-2.json --reference mpi-results/serial.json
+          mpiexec --oversubscribe -n 4 python -m optimization.scenario_sweep --hours 24 --output mpi-results/ranks-4.json --reference mpi-results/serial.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mpi-equivalence-results
+          path: mpi-results/

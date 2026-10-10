@@ -6,7 +6,7 @@ A reproducible Pyomo/HiGHS model coupling electricity, hydrogen, and heat: hourl
 
 The checked-in reference configuration covers 168 hourly timesteps; `configs/annual.yaml` covers the full 8,760-hour year and has a real recorded run (see below). The model includes wind availability, electrolyser minimum/maximum load and ramping, a simplified hydrogen-pipeline capacity constraint, and hydrogen-demand constraints. Hydrogen storage, grid import/export, and electrolyser waste-heat recovery (with heat storage and backup boiler) are all implemented but opt-in (`optimize(enable_storage=True, enable_grid=True, enable_heat=True)`) and off by default. It is a screening model, not a project-specific engineering design.
 
-`data/era5.py` implements and unit-tests a real Copernicus Climate Data Store fetch, nearest-grid-cell extraction, hub-height shear correction, and a committed provenance record (`pynexus fetch-era5` / `fetch-era5-year`) — see [`docs/data_provenance.md`](docs/data_provenance.md). A full year of real 2023 ERA5 wind for the configured North Sea site has been fetched (chunked by month, per a real CDS request-size limit) and run through the dispatch model — see [`docs/reproducibility.md`](docs/reproducibility.md)'s 2026-09-01 section and [`docs/validation.md`](docs/validation.md) for the resulting capacity factor. `data/entsoe.py` implements and unit-tests the equivalent path for ENTSO-E day-ahead prices, but has no live fetch yet (needs a separate `ENTSOE_API_KEY`) and isn't wired into `pynexus solve` — `--wind-csv` pairs real wind with synthetic prices as an interim hybrid. Deterministic tests continue to use synthetic arrays.
+`data/era5.py` implements and unit-tests a real Copernicus Climate Data Store fetch, nearest-grid-cell extraction, hub-height shear correction, and a committed provenance record (`pynexus fetch-era5` / `fetch-era5-year`) â€” see [`docs/data_provenance.md`](docs/data_provenance.md). A full year of real 2023 ERA5 wind for the configured North Sea site has been fetched (chunked by month, per a real CDS request-size limit) and run through the dispatch model â€” see [`docs/reproducibility.md`](docs/reproducibility.md)'s 2026-09-01 section and [`docs/validation.md`](docs/validation.md) for the resulting capacity factor. `data/entsoe.py` implements and unit-tests the equivalent path for ENTSO-E day-ahead prices, but has no live fetch yet (needs a separate `ENTSOE_API_KEY`) and isn't wired into `pynexus solve` â€” `--wind-csv` pairs real wind with synthetic prices as an interim hybrid. Deterministic tests continue to use synthetic arrays.
 
 ## Quick start
 
@@ -30,10 +30,10 @@ settings/status, model size and independent numerical checks. It rejects an
 existing output directory to prevent stale results after a failed solve.
 
 `--enable-storage`, `--enable-grid`, `--enable-heat` (add `--demand-mode hourly`
-alongside — storage/heat are no-ops in cumulative mode, see `docs/formulation.md`)
+alongside â€” storage/heat are no-ops in cumulative mode, see `docs/formulation.md`)
 turn on Phase A/B: hydrogen storage, grid import/export, and electrolyser
 waste-heat/heat-storage/boiler coupling. `--enable-heat` requires a
-`heat_demand_mw` input column — auto-generated for `--synthetic`/`--wind-csv`,
+`heat_demand_mw` input column â€” auto-generated for `--synthetic`/`--wind-csv`,
 required in a user `--input` CSV. All three are recorded in the run manifest and
 independently re-checked by `verify`, same as the baseline path.
 
@@ -44,14 +44,14 @@ provenance record; it requires the `[data]` extra and a CDS account (see
 
 ## GUI
 
-`ui/app.py` is a Streamlit GUI over the exact same `ElectrolyzerDispatchOptimizer.optimize` / `verify_dispatch` code path `pynexus solve` / `verify` use — no separate logic, nothing the CLI can't already do.
+`ui/app.py` is a Streamlit GUI over the exact same `ElectrolyzerDispatchOptimizer.optimize` / `verify_dispatch` code path `pynexus solve` / `verify` use â€” no separate logic, nothing the CLI can't already do.
 
 ```bash
 pip install -e ".[ui]"
 streamlit run ui/app.py
 ```
 
-**Run dispatch** — configure a run (config, input source, objective, demand mode, Phase A/B toggles) and solve it live, with the same independent verification and a downloadable `dispatch.csv`:
+**Run dispatch** â€” configure a run (config, input source, objective, demand mode, Phase A/B toggles) and solve it live, with the same independent verification and a downloadable `dispatch.csv`:
 
 ![Run dispatch: configuration and results](docs/screenshots/03_run_dispatch_results.png)
 
@@ -59,33 +59,33 @@ Enabling storage/grid/heat adds their own charts (this is the same run, scrolled
 
 ![Storage and grid charts](docs/screenshots/04_run_dispatch_storage_grid.png)
 
-**Browse past runs** — load any committed `run_manifest.json`/`dispatch.csv` pair from `outputs/`, including the real annual runs from `docs/reproducibility.md`'s 2026-09-01 section:
+**Browse past runs** â€” load any committed `run_manifest.json`/`dispatch.csv` pair from `outputs/`, including the real annual runs from `docs/reproducibility.md`'s 2026-09-01 section:
 
 ![Browsing the real annual grid+storage run](docs/screenshots/06_browse_past_runs.png)
 
-**Capacity factor** — the real ERA5-derived capacity factor (`docs/validation.md`) computed live from `data/raw/era5_2023_wind.csv`:
+**Capacity factor** â€” the real ERA5-derived capacity factor (`docs/validation.md`) computed live from `data/raw/era5_2023_wind.csv`:
 
 ![Capacity factor from real ERA5 wind](docs/screenshots/07_capacity_factor.png)
 
-**Data reconciliation** — an interactive version of `docs/reconciliation.md`'s WLS + chi-square(1) gross-error test; biasing one sensor here trips the same flag the tests check for:
+**Data reconciliation** â€” an interactive version of `docs/reconciliation.md`'s WLS + chi-square(1) gross-error test; biasing one sensor here trips the same flag the tests check for:
 
 ![A biased sensor tripping the gross-error flag](docs/screenshots/09_reconciliation_gross_error.png)
 
 ## Configuration
 
-`config.yaml` remains the backward-compatible weekly default. `configs/tiny_test.yaml` is a compact deterministic test configuration. `configs/annual.yaml` is the 8,760-hour configuration, added after a complete run with recorded solver status and checked output — see `docs/reproducibility.md`. Its wind-only and grid-only-cumulative variants are genuinely infeasible against real 2023 wind at the configured demand rate; the recorded successful run uses `--enable-grid --enable-storage --demand-mode hourly` and still leaves ~16% of annual demand unmet — a real capacity-planning finding, not a claim that the configured system fully meets its own demand target.
+`config.yaml` remains the backward-compatible weekly default. `configs/tiny_test.yaml` is a compact deterministic test configuration. `configs/annual.yaml` is the 8,760-hour configuration, added after a complete run with recorded solver status and checked output â€” see `docs/reproducibility.md`. Its wind-only and grid-only-cumulative variants are genuinely infeasible against real 2023 wind at the configured demand rate; the recorded successful run uses `--enable-grid --enable-storage --demand-mode hourly` and still leaves ~16% of annual demand unmet â€” a real capacity-planning finding, not a claim that the configured system fully meets its own demand target.
 
 ## Method and evidence
 
-- `docs/formulation.md` — decision variables, objective, constraints, and units
-- `docs/assumptions.md` — implemented scope and limitations
-- `docs/data_provenance.md` — source/configuration boundary
-- `docs/reconciliation.md` — hydrogen mass-balance WLS reconciliation and gross-error detection
-- `docs/validation.md` — capacity-factor sanity check against a published source
-- `docs/results.md` — does heat coupling change dispatch? A tested finding, with figure
-- `docs/verification.md` — deterministic test evidence and validation terminology
-- `ui/app.py` — Streamlit GUI (see [GUI](#gui) above)
-- `tests/` — fast component and optimisation tests
+- `docs/formulation.md` â€” decision variables, objective, constraints, and units
+- `docs/assumptions.md` â€” implemented scope and limitations
+- `docs/data_provenance.md` â€” source/configuration boundary
+- `docs/reconciliation.md` â€” hydrogen mass-balance WLS reconciliation and gross-error detection
+- `docs/validation.md` â€” capacity-factor sanity check against a published source
+- `docs/results.md` â€” does heat coupling change dispatch? A tested finding, with figure
+- `docs/verification.md` â€” deterministic test evidence and validation terminology
+- `ui/app.py` â€” Streamlit GUI (see [GUI](#gui) above)
+- `tests/` â€” fast component and optimisation tests
 - [Reproducibility and change evidence](docs/reproducibility.md)
 
 ## Contributing
@@ -95,3 +95,10 @@ See `CONTRIBUTING.md`. Calculation changes require tests and explicit units. Nev
 ## Licence
 
 Code in this repository is available under the MIT License. Third-party dependencies retain their own licences.
+
+
+## Parallel execution and CI
+
+Optional mpi4py distribution of independent synthetic demand/price scenarios with standalone equivalence checks and measured end-to-end timings. See [docs/mpi_scaling.md](docs/mpi_scaling.md).
+
+CI runs on Ubuntu, Windows and macOS. ThermoTwin-F uses release/debug profiles and serial/OpenMP builds; PyNEXUS tests Python 3.10, 3.11 and 3.12 and runs a separate Linux MPI equivalence job. Weekly runs check dependency drift. Hosted run status is available in the repository’s Actions tab; documented local measurements are separate from hosted verification.
