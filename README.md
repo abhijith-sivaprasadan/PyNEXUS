@@ -95,3 +95,9 @@ See `CONTRIBUTING.md`. Calculation changes require tests and explicit units. Nev
 ## Licence
 
 Code in this repository is available under the MIT License. Third-party dependencies retain their own licences.
+
+## Parallel execution and CI
+
+Optional mpi4py distribution of independent synthetic demand/price scenarios with standalone equivalence checks and measured end-to-end timings. See [docs/mpi_scaling.md](docs/mpi_scaling.md).
+
+CI runs on Ubuntu, Windows and macOS. ThermoTwin-F uses release/debug profiles and serial/OpenMP builds; PyNEXUS tests Python 3.10, 3.11 and 3.12 and runs a separate Linux MPI equivalence job. Weekly runs check dependency drift. Hosted run status is available in the repository’s Actions tab; documented local measurements are separate from hosted verification.
