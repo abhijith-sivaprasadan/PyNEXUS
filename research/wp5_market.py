@@ -47,9 +47,7 @@ def recover_from_independent_a44_query(annual_prices, targeted_prices):
         utc = prices.index.tz_convert("UTC")
         keep = (utc >= START) & (utc < END)
         data = pd.Series(
-            pd.to_numeric(prices.iloc[np.flatnonzero(keep)], errors="raise").to_numpy(
-                dtype=float
-            ),
+            pd.to_numeric(prices.iloc[np.flatnonzero(keep)], errors="raise").to_numpy(dtype=float),
             index=utc[keep],
         )
         if not np.isfinite(data.to_numpy()).all():
@@ -85,9 +83,7 @@ def recover_from_independent_a44_query(annual_prices, targeted_prices):
         "status": "RECOVERED_EXPLICITLY_OBSERVED_A44_PRICE_NOT_INTERPOLATED",
         "method": "SECOND_OFFICIAL_NL_A44_QUERY_WITH_FULL_OVERLAP_CONSISTENCY_CHECK",
         "recovered_utc_timestamp": GAP_2023_UTC.isoformat(),
-        "recovered_local_timestamp": GAP_2023_UTC.tz_convert(
-            "Europe/Amsterdam"
-        ).isoformat(),
+        "recovered_local_timestamp": GAP_2023_UTC.tz_convert("Europe/Amsterdam").isoformat(),
         "recovered_price_eur_per_mwh": float(candidate.loc[GAP_2023_UTC]),
         "recovered_observation_count": 1,
         "independent_overlap_hour_count": int(len(overlap)),
@@ -95,8 +91,6 @@ def recover_from_independent_a44_query(annual_prices, targeted_prices):
         "price_interpolation_or_forward_fill": False,
     }
     return merged, audit
-
-
 
 
 def price_coverage_diagnostics(prices):
