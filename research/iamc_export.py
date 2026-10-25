@@ -101,7 +101,9 @@ def validate_synthesis(result, demand_per_day_kg):
         rows = [r for r in records if r["year"] == year]
         hours = 8784 if year == 2024 else 8760
         demand = demand_per_day_kg * hours / 24
-        baseline = _finite(rows[0]["unserved_fraction"], "baseline shortfall fraction", minimum=0, maximum=1)
+        baseline = _finite(
+            rows[0]["unserved_fraction"], "baseline shortfall fraction", minimum=0, maximum=1
+        )
         resource = _finite(rows[0]["wind_resource_mwh"], "baseline reference wind", minimum=0)
         cf = _finite(rows[0]["wind_capacity_factor"], "baseline wind CF", minimum=0, maximum=1)
         _near(
