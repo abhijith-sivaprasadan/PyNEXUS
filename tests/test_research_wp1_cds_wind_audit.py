@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from components.wind_turbine import OffshoreWindFarm
-from data.era5 import wind_speed_at_hub_height_from_100m
+from data.era5 import CoverageError, wind_speed_at_hub_height_from_100m
 from research.run_reference import CONFIG
 from research.wp1_cds_wind_audit import audit_cds_year, compare_utc_hourly_wind
 
@@ -27,7 +27,7 @@ def test_utc_hour_alignment_and_double_shear_avoidance():
 def test_wrong_utc_origin_rejected_even_with_exact_8760_values():
     times = pd.date_range("2023-01-01T01:00:00Z", periods=8760, freq="h")
     wind = pd.DataFrame({"wind_speed_100m_ms": np.full(8760, 9.0)}, index=times)
-    with pytest.raises(ValueError, match="coverage|ordered"):
+    with pytest.raises((CoverageError, ValueError), match="coverage|ordered"):
         compare_utc_hourly_wind(wind, np.full(8760, 1.0))
 
 
