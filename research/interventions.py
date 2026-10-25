@@ -56,9 +56,7 @@ def config_for_case(base_config, protocol, active):
     # The observed reference annual wind series is an already-computed farm
     # output. For W, identical turbines and fixed per-unit loss factors imply
     # proportional scaling without inventing new weather observations.
-    wind_scale = (
-        cfg["wind_turbine"]["n_turbines"] / base_config["wind_turbine"]["n_turbines"]
-    )
+    wind_scale = cfg["wind_turbine"]["n_turbines"] / base_config["wind_turbine"]["n_turbines"]
     if not np.isfinite(wind_scale) or wind_scale <= 0:
         raise ValueError("Nonpositive wind capacity multiplier")
     # Critical isolation: changing storage capacity DOES NOT create free
@@ -138,9 +136,7 @@ def evaluate_case(case, base_cfg, source, protocol, destination, *, time_limit):
     opt = ElectrolyzerDispatchOptimizer(str(config_path))
     wind = source["wind_available_mw"].to_numpy(dtype=float) * wind_scale
     prices = source["electricity_price"].to_numpy(dtype=float)
-    expected_capacity = (
-        cfg["wind_turbine"]["n_turbines"] * cfg["wind_turbine"]["rated_power_mw"]
-    )
+    expected_capacity = cfg["wind_turbine"]["n_turbines"] * cfg["wind_turbine"]["rated_power_mw"]
     if np.any(wind < 0) or np.any(wind > expected_capacity + 1e-6):
         raise ValueError("Wind availability outside registered installed nameplate")
     run = solve_adequacy_first(opt, wind, prices, enable_storage=True)
@@ -152,28 +148,18 @@ def evaluate_case(case, base_cfg, source, protocol, destination, *, time_limit):
     metrics = {
         "demand_h2_kg": float(run["total_demand_kg"]),
         "stage_a_shortfall_kg": float(run["stage_a_unserved_kg"]),
-        "stage_a_shortfall_fraction": float(
-            run["stage_a_unserved_kg"] / run["total_demand_kg"]
-        ),
+        "stage_a_shortfall_fraction": float(run["stage_a_unserved_kg"] / run["total_demand_kg"]),
         "stage_b_shortfall_kg": float(run["stage_b_unserved_kg"]),
-        "independent_lower_bound_kg": float(
-            run["optimistic_shortfall_lower_bound_kg"]
-        ),
-        "stage_b_grid_settlement_eur_synthetic_prices": float(
-            run["stage_b_grid_settlement_eur"]
-        ),
+        "independent_lower_bound_kg": float(run["optimistic_shortfall_lower_bound_kg"]),
+        "stage_b_grid_settlement_eur_synthetic_prices": float(run["stage_b_grid_settlement_eur"]),
         "wind_available_mwh": float(df["wind_available_mw"].sum() * dt),
         "electrolyser_input_mwh": float(df["power_optimized_mw"].sum() * dt),
         "h2_produced_kg": float(df["h2_produced_kg_h"].sum() * dt),
         "grid_import_mwh": float(df["grid_import_mw"].sum() * dt),
         "grid_export_mwh": float(df["grid_export_mw"].sum() * dt),
-        "grid_net_import_mwh": float(
-            (df["grid_import_mw"] - df["grid_export_mw"]).sum() * dt
-        ),
+        "grid_net_import_mwh": float((df["grid_import_mw"] - df["grid_export_mw"]).sum() * dt),
         "curtailment_mwh": float(df["curtailment_mw"].sum() * dt),
-        "shortfall_hours_stage_b": int(
-            (df["demand_slack_kg_h"] > 1e-5).sum()
-        ),
+        "shortfall_hours_stage_b": int((df["demand_slack_kg_h"] > 1e-5).sum()),
         "electrolyser_capacity_mw": float(opt.p_rated),
         "grid_capacity_mw": float(opt.grid_connection_mw),
         "wind_nameplate_mw": float(expected_capacity),
@@ -190,7 +176,8 @@ def evaluate_case(case, base_cfg, source, protocol, destination, *, time_limit):
         "config_sha256": sha256(config_path),
         "dispatch_hashes": artifacts,
         "solver_a": {
-            k: a[k] for k in (
+            k: a[k]
+            for k in (
                 "solver_status",
                 "termination_condition",
                 "solve_wall_time_s",
@@ -200,7 +187,8 @@ def evaluate_case(case, base_cfg, source, protocol, destination, *, time_limit):
             )
         },
         "solver_b": {
-            k: b[k] for k in (
+            k: b[k]
+            for k in (
                 "solver_status",
                 "termination_condition",
                 "solve_wall_time_s",
@@ -232,11 +220,13 @@ def analyse_contrasts(results, order):
     pairs = []
     for a, b in itertools.combinations(order, 2):
         name = a + "+" + b
-        pairs.append({
-            "pair": name,
-            "benefit_fraction": benefit[name],
-            "interaction_fraction": benefit[name] - benefit[a] - benefit[b],
-        })
+        pairs.append(
+            {
+                "pair": name,
+                "benefit_fraction": benefit[name],
+                "interaction_fraction": benefit[name] - benefit[a] - benefit[b],
+            }
+        )
     return {
         "baseline_shortfall_fraction": base,
         "single_benefits_fraction": {name: benefit[name] for name in order},
@@ -310,13 +300,15 @@ def run_matrix(destination, *, hours=8760, scenario_filter=None, time_limit=600)
             )
         except Exception as exc:
             errors.append({"scenario": label, "error_type": type(exc).__name__, "error": str(exc)})
-            summary["cases"].append({
-                "scenario": label,
-                "active_interventions": list(case[1]),
-                "status": "ERROR_NOT_A_RESULT",
-                "error_type": type(exc).__name__,
-                "error": str(exc),
-            })
+            summary["cases"].append(
+                {
+                    "scenario": label,
+                    "active_interventions": list(case[1]),
+                    "status": "ERROR_NOT_A_RESULT",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
             print(f"{label}: FAILED: {type(exc).__name__}: {exc}", flush=True)
         (destination / "summary.json").write_text(
             json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
@@ -327,7 +319,9 @@ def run_matrix(destination, *, hours=8760, scenario_filter=None, time_limit=600)
     if not errors:
         if len(cases) == 17:
             summary["contrasts"] = analyse_contrasts(summary["cases"], order)
-        summary["status"] = "COMPLETE_REGISTERED_MATRIX" if complete else "VERIFIED_PARTIAL_OR_SMOKE"
+        summary["status"] = (
+            "COMPLETE_REGISTERED_MATRIX" if complete else "VERIFIED_PARTIAL_OR_SMOKE"
+        )
     (destination / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
