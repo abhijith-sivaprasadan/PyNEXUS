@@ -4,6 +4,7 @@ Run with an ENTSO-E API token to obtain a processed A44 series; no observed
 electricity data are bundled. Raw ENTSO-E XML is NOT retained by this adapter.
 A price-informed dispatch does NOT constitute a full technoeconomic LCOH.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,9 +43,7 @@ def normalise_hourly_prices(prices):
     # 2023 UTC year. Only that precise UTC interval is admissible downstream.
     keep = (utc >= START) & (utc < END)
     clipped_index = utc[keep]
-    values = pd.to_numeric(prices.iloc[np.flatnonzero(keep)], errors="raise").to_numpy(
-        dtype=float
-    )
+    values = pd.to_numeric(prices.iloc[np.flatnonzero(keep)], errors="raise").to_numpy(dtype=float)
     if not clipped_index.equals(EXPECTED):
         raise ValueError(
             "Missing/extra or nonhourly records in 2023 UTC; "
@@ -150,9 +149,7 @@ def fetch_official_snapshot(output):
     # Local market request deliberately brackets the 2023 UTC year. Query
     # includes extra local days at both ends so time-zone offsets cannot
     # silently omit the 2023-12-31 23:00 UTC interval.
-    series, metadata = fetch_entsoe_prices(
-        "NL", "2022-12-31", "2024-01-01", "Europe/Amsterdam"
-    )
+    series, metadata = fetch_entsoe_prices("NL", "2022-12-31", "2024-01-01", "Europe/Amsterdam")
     return write_snapshot(output, series, metadata=metadata)
 
 
@@ -209,9 +206,9 @@ def run_market_case(snapshot, output, *, scenario="baseline", hours=8760, time_l
             record = evaluate_case(
                 item, base_cfg, source, protocol, output / item[0], time_limit=time_limit
             )
-            record["metrics"]["stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT"] = (
-                record["metrics"].pop("stage_b_grid_settlement_eur_synthetic_prices")
-            )
+            record["metrics"]["stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT"] = record[
+                "metrics"
+            ].pop("stage_b_grid_settlement_eur_synthetic_prices")
             record["price_csv_sha256"] = price_manifest["csv_sha256"]
             record["price_kind"] = results["price_kind"]
             stage_b = pd.read_csv(output / item[0] / "stage_b.csv")
@@ -263,12 +260,13 @@ def main(argv=None):
         result = fetch_official_snapshot(args.output)
     else:
         result = run_market_case(
-            args.snapshot, args.output, scenario=args.scenario,
-            hours=args.hours, time_limit=args.time_limit,
+            args.snapshot,
+            args.output,
+            scenario=args.scenario,
+            hours=args.hours,
+            time_limit=args.time_limit,
         )
-    print(json.dumps({
-        key: result[key] for key in ("status", "schema_version")
-    }, indent=2))
+    print(json.dumps({key: result[key] for key in ("status", "schema_version")}, indent=2))
     return 0
 
 
