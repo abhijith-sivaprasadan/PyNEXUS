@@ -39,10 +39,8 @@ def record(name, *, storage_kg, shortfall_kg, settlement, spent, revenue):
 
 
 def pair():
-    e = record("E", storage_kg=20000, shortfall_kg=300,
-               settlement=200, spent=450, revenue=250)
-    es = record("E+S", storage_kg=40000, shortfall_kg=200,
-                settlement=350, spent=480, revenue=130)
+    e = record("E", storage_kg=20000, shortfall_kg=300, settlement=200, spent=450, revenue=250)
+    es = record("E+S", storage_kg=40000, shortfall_kg=200, settlement=350, spent=480, revenue=130)
     return e, es
 
 
