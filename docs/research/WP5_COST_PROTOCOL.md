@@ -1,6 +1,6 @@
 # WP5 — cost/adequacy accounting protocol (implementation gate)
 
-**State:** code and toy-unit verification; no financial result is claimed.
+**State (25 October 2026):** sourced full-system cost frontier remains blocked. Legacy 17-case synthetic-price accounting framework is unit-tested. Separately, observed 2023 NL A44 E/E+S annual dispatch and independently reverified *wholesale settlement only* results exist; [see observed-price source and conditional marginal-storage cost gate](WP5_OBSERVED_SOURCE_COST_GATE.md). Do not treat the latter as populated full-system CAPEX/OPEX or as the same original synthetic-price 17-case objective.
 This WP5 branch follows the verified but unmerged WP4 research branch.
 
 ## Mathematical boundary
@@ -79,10 +79,7 @@ the verified WP2 summary and cost assumptions.
 - Source price-year-normalised CAPEX/OPEX for offshore wind, electrolyser,
   storage, grid reinforcement, and the incremental efficiency improvement.
 - Establish asset lifetime, residual-value/degradation and replacement logic.
-- Obtain actual Netherlands hourly power prices covering the chosen year,
-  with named bidding zone, market zone and timezone conversion evidence.
-- Re-optimise Stage B against these price observations (not revalue
-  synthetic-price-optimised dispatch at historical prices).
+- Completed in the separate three-case WP5B dataset: obtain and validate the processed 2023 Netherlands 8,760-hour NL A44 price series with explicit UTC controls and run new observed-price Stage B for baseline/E/E+S. Primary raw XML and independent original CDS wind-hour alignment still require audit. **The other 14 scenarios have not been observed-price-rerun.**
 - Validate non-circulating grid exchange, transmission tariffs, storage costs,
   wind operating costs and all equipment boundary assumptions.
 - Only then compare market-derived, explicitly scoped economics; separately

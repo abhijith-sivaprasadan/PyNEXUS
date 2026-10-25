@@ -1,0 +1,64 @@
+name: WP5 observed 2023 storage evidence regression
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: wp5-observed-evidence-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    name: Recompute E vs E+S 2023 hourly prices and storage effect
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q tests/test_research_wp5_observed_storage.py
+      - name: Download original verified NL 2023 E annual dispatch
+        uses: actions/download-artifact@v4
+        with:
+          name: wp5-nl-2023-annual-selected-E-redispatch
+          run-id: 40217860564
+          github-token: ${{ github.token }}
+          path: wp5-e
+      - name: Download original verified NL 2023 E+S annual dispatch
+        uses: actions/download-artifact@v4
+        with:
+          name: wp5-nl-2023-annual-selected-E+S-redispatch
+          run-id: 40216993086
+          github-token: ${{ github.token }}
+          path: wp5-es
+      - name: Package raw unmodified Actions contents as ZIP for independent byte audit
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          for name, directory in (("E", Path("wp5-e")), ("E+S", Path("wp5-es"))):
+              with zipfile.ZipFile("wp5-" + name.replace("+", "plus") + ".zip", "w") as out:
+                  for item in sorted(directory.rglob("*")):
+                      if item.is_file():
+                          out.write(item, item.relative_to(directory).as_posix())
+          PY
+      - name: Recalculate verified 8,760h marginal storage settlement
+        run: |
+          python -m research.wp5_observed_storage \
+            --E wp5-E.zip --ES wp5-EplusS.zip \
+            --output wp5-observed-storage-audit
+      - name: Preserve recomputed evidence and explicit limits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp5-observed-2023-marginal-storage-reverification
+          path: wp5-observed-storage-audit/
+          if-no-files-found: warn
+          retention-days: 60
