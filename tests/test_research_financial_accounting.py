@@ -122,6 +122,10 @@ def test_source_and_cost_completeness_is_mandatory():
     with pytest.raises(ValueError, match="source"):
         validate_assumptions(cfg)
     cfg = assumptions()
+    cfg["assets"]["wind"]["sources"]["capex_eur_per_mw"] = "REPLACE_WITH_TRACEABLE_SOURCE"
+    with pytest.raises(ValueError, match="source"):
+        validate_assumptions(cfg)
+    cfg = assumptions()
     cfg["electricity_prices"] = "REAL_NL_2023"
     with pytest.raises(ValueError, match="re-label"):
         validate_assumptions(cfg)
