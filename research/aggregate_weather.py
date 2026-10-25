@@ -25,14 +25,20 @@ def summarize_year(archive, registration, wp2, base_config):
     path = archive / "year_manifest.json"
     result = json.loads(path.read_text(encoding="utf-8"))
     year = int(result["year"])
-    if result["schema_version"] != "pynexus.wp4.year.v1" or result["status"] != "COMPLETE_SEVEN_CASES_YEAR":
+    if (
+        result["schema_version"] != "pynexus.wp4.year.v1"
+        or result["status"] != "COMPLETE_SEVEN_CASES_YEAR"
+    ):
         raise ValueError(f"{year}: no complete, verified year manifest")
     if year not in YEARS or result["hours"] != registration["hours_per_year"][str(year)]:
         raise ValueError("Year not registered or wrong leap-year horizon")
-    if (result["wp4_protocol_sha256"] != sha256(PROTOCOL)
-        or result["wp2_protocol_sha256"] != sha256(WP2_PROTOCOL)):
+    if result["wp4_protocol_sha256"] != sha256(PROTOCOL) or result["wp2_protocol_sha256"] != sha256(
+        WP2_PROTOCOL
+    ):
         raise ValueError(f"{year}: study protocol checksum drift")
-    if result["base_config_sha256"] != sha256(ROOT / "outputs/annual_2023/grid_storage_hourly/config.yaml"):
+    if result["base_config_sha256"] != sha256(
+        ROOT / "outputs/annual_2023/grid_storage_hourly/config.yaml"
+    ):
         raise ValueError(f"{year}: reference config changed")
     raw = (archive / "source_weather_api.json").read_bytes()
     if sha256(archive / "source_weather_api.json") != result["raw_api_response_sha256"]:
@@ -87,42 +93,60 @@ def summarize_year(archive, registration, wp2, base_config):
             ):
                 raise ValueError(f"{year} {name}: mismatched intervention weather input")
         for exported, obj, value, key, cap in (
-            (a, "minimize_unserved", record["metrics"]["stage_a_shortfall_kg"], "verification_a", None),
-            (b, "minimize_cash_cost",
-             record["metrics"]["stage_b_grid_settlement_eur_synthetic_prices"],
-             "verification_b",
-             record["metrics"]["stage_a_shortfall_kg"]
-             + max(1e-4, 1e-8 * record["metrics"]["demand_h2_kg"])),
+            (
+                a,
+                "minimize_unserved",
+                record["metrics"]["stage_a_shortfall_kg"],
+                "verification_a",
+                None,
+            ),
+            (
+                b,
+                "minimize_cash_cost",
+                record["metrics"]["stage_b_grid_settlement_eur_synthetic_prices"],
+                "verification_b",
+                record["metrics"]["stage_a_shortfall_kg"]
+                + max(1e-4, 1e-8 * record["metrics"]["demand_h2_kg"]),
+            ),
         ):
             verification = verify_dispatch(
-                opt, exported, value, obj, "hourly", enable_grid=True,
-                enable_storage=True, shortfall_cap_kg=cap,
+                opt,
+                exported,
+                value,
+                obj,
+                "hourly",
+                enable_grid=True,
+                enable_storage=True,
+                shortfall_cap_kg=cap,
             )
             if not verification["passed"] or verification["checks"] != record[key]:
                 raise ValueError(f"{year} {name}: independent verification rejected dispatch")
-        fraction = float(a["demand_slack_kg_h"].sum() * opt.dt /
-                         (a["h2_demand_kg_h"].sum() * opt.dt))
+        fraction = float(
+            a["demand_slack_kg_h"].sum() * opt.dt / (a["h2_demand_kg_h"].sum() * opt.dt)
+        )
         if not np.isclose(fraction, record["metrics"]["stage_a_shortfall_fraction"], atol=1e-9):
             raise ValueError("Stored KPI differs from independently computed shortfall")
-        rows.append({
-            "year": year,
-            "scenario": name,
-            "unserved_h2_kg": float(record["metrics"]["stage_a_shortfall_kg"]),
-            "unserved_fraction": fraction,
-            "wind_resource_mwh": float(expected_wind.sum()),
-            "wind_capacity_factor": float(result["annual_nameplate_capacity_factor"]),
-            "hours": len(times),
-        })
+        rows.append(
+            {
+                "year": year,
+                "scenario": name,
+                "unserved_h2_kg": float(record["metrics"]["stage_a_shortfall_kg"]),
+                "unserved_fraction": fraction,
+                "wind_resource_mwh": float(expected_wind.sum()),
+                "wind_capacity_factor": float(result["annual_nameplate_capacity_factor"]),
+                "hours": len(times),
+            }
+        )
     by_name = {row["scenario"]: row for row in rows}
     b = by_name["baseline"]["unserved_fraction"]
     for row in rows:
         row["benefit_percentage_points"] = (b - row["unserved_fraction"]) * 100
-    es_conditional = (
-        by_name["E"]["unserved_fraction"] - by_name["E+S"]["unserved_fraction"]
-    ) * 100
+    es_conditional = (by_name["E"]["unserved_fraction"] - by_name["E+S"]["unserved_fraction"]) * 100
     interaction_pp = (
-        by_name["E"]["unserved_fraction"] + by_name["S"]["unserved_fraction"]
-        - b - by_name["E+S"]["unserved_fraction"]
+        by_name["E"]["unserved_fraction"]
+        + by_name["S"]["unserved_fraction"]
+        - b
+        - by_name["E+S"]["unserved_fraction"]
     ) * 100
     if not np.isclose(interaction_pp, result["electrolyser_storage_interaction_pp"], atol=1e-6):
         raise ValueError("Wrong archived E+S interaction")
@@ -171,9 +195,7 @@ def aggregate(root):
             ["benefit_percentage_points", "scenario"],
             ascending=[False, True],
         )["scenario"].tolist()
-    unique_winners = {
-        y: rankings[y][0] for y in YEARS
-    }
+    unique_winners = {y: rankings[y][0] for y in YEARS}
     return {
         "schema_version": "pynexus.wp4.interannual.v1",
         "status": "COMPLETE_5_YEAR_35_SCENARIO_COMPARISON",
@@ -223,43 +245,49 @@ def report(result):
             f"| {x['E_plus_S_interaction_pp']:+.3f} pp "
             f"| {x['storage_conditional_benefit_after_E_pp']:.3f} pp |"
         )
-    lines.extend([
-        "",
-        "## Single intervention ranking by year",
-        "",
-        "| Year | Ranking, largest to smallest reduction in unmet H2 |",
-        "|---|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Single intervention ranking by year",
+            "",
+            "| Year | Ranking, largest to smallest reduction in unmet H2 |",
+            "|---|---|",
+        ]
+    )
     for year, ranking in result["individual_intervention_rankings"].items():
         lines.append(f"| {year} | {' > '.join(ranking)} |")
-    lines.extend([
-        "",
-        "## 2023 cross-source check",
-        "",
-        "The 2023 Open-Meteo ERA5 run is recomputed in the same data family as every other "
-        "WP4 year. It is **not substituted for**, and should not be pooled with, "
-        "the earlier CDS-backed 2023 WP2 control.",
-    ])
+    lines.extend(
+        [
+            "",
+            "## 2023 cross-source check",
+            "",
+            "The 2023 Open-Meteo ERA5 run is recomputed in the same data family as every other "
+            "WP4 year. It is **not substituted for**, and should not be pooled with, "
+            "the earlier CDS-backed 2023 WP2 control.",
+        ]
+    )
     ctrl = next(x["cds_2023_comparison"] for x in result["annual_metrics"] if x["year"] == 2023)
-    lines.extend([
-        f"- CDS-2023 wind availability: {ctrl['historical_cds_wind_available_mwh']:.2f} MWh",
-        f"- Open-Meteo ERA5-2023 wind availability: "
-        f"{ctrl['open_meteo_era5_wind_available_mwh']:.2f} MWh",
-        f"- Hourly two-source wind-power MAE: {ctrl['hourly_power_mae_mw']:.3f} MW",
-        f"- Hourly two-source wind-power RMSE: {ctrl['hourly_power_rmse_mw']:.3f} MW",
-        "",
-        "## Important limitations",
-        "",
-        "- This is a 5-year sensitivity screening, not a probabilistic prediction "
-        "or evidence of future wind-climate frequencies.",
-        "- Wind is from Open-Meteo's explicitly selected ERA5 route. "
-        "Observed power-curve/farm representation remains simplified.",
-        "- The price series is a deterministic *synthetic 2023* sequence reused each "
-        "year. Only physical adequacy metrics are used for intervention ranking.",
-        "- Grid-imported electricity meeting hydrogen demand does not imply it is renewable.",
-        "- An interaction in this numerical scenario set is a finite contrast, "
-        "not proof of a field-observed technology synergy.",
-    ])
+    lines.extend(
+        [
+            f"- CDS-2023 wind availability: {ctrl['historical_cds_wind_available_mwh']:.2f} MWh",
+            f"- Open-Meteo ERA5-2023 wind availability: "
+            f"{ctrl['open_meteo_era5_wind_available_mwh']:.2f} MWh",
+            f"- Hourly two-source wind-power MAE: {ctrl['hourly_power_mae_mw']:.3f} MW",
+            f"- Hourly two-source wind-power RMSE: {ctrl['hourly_power_rmse_mw']:.3f} MW",
+            "",
+            "## Important limitations",
+            "",
+            "- This is a 5-year sensitivity screening, not a probabilistic prediction "
+            "or evidence of future wind-climate frequencies.",
+            "- Wind is from Open-Meteo's explicitly selected ERA5 route. "
+            "Observed power-curve/farm representation remains simplified.",
+            "- The price series is a deterministic *synthetic 2023* sequence reused each "
+            "year. Only physical adequacy metrics are used for intervention ranking.",
+            "- Grid-imported electricity meeting hydrogen demand does not imply it is renewable.",
+            "- An interaction in this numerical scenario set is a finite contrast, "
+            "not proof of a field-observed technology synergy.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -279,12 +307,8 @@ def main(argv=None):
     pd.DataFrame(result["annual_results"]).to_csv(
         args.output / "scenario_comparison.csv", index=False
     )
-    pd.DataFrame(result["annual_metrics"]).to_csv(
-        args.output / "year_comparison.csv", index=False
-    )
-    (args.output / "RESEARCH_FINDINGS.md").write_text(
-        report(result), encoding="utf-8"
-    )
+    pd.DataFrame(result["annual_metrics"]).to_csv(args.output / "year_comparison.csv", index=False)
+    (args.output / "RESEARCH_FINDINGS.md").write_text(report(result), encoding="utf-8")
     print(
         f"WP4 VERIFIED: {result['weather_year_count']} years "
         f"{result['scenario_count']} cases; E+S interaction range "
