@@ -5,6 +5,8 @@ weather_provider: open-meteo historical archive
 weather_model: era5
 weather_variable: wind_speed_100m
 weather_speed_unit: m/s
+cell_selection: nearest
+elevation_adjustment: disabled_with_elevation_nan
 provider_url: https://archive-api.open-meteo.com/v1/archive
 latitude: 52.5
 longitude: 3.5
