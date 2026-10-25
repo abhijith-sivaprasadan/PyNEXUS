@@ -44,7 +44,10 @@ def _assert_close(actual, expected, *, atol=1e-5, label="value"):
 def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
     label, active = case
     folder = source_dir / label
-    if summary_record["scenario"] != label or summary_record["status"] != "VERIFIED_TWO_STAGE_SOLVE":
+    if (
+        summary_record["scenario"] != label
+        or summary_record["status"] != "VERIFIED_TWO_STAGE_SOLVE"
+    ):
         raise ValueError(f"Missing independently verified WP2 case {label}")
     if tuple(summary_record["active_interventions"]) != active:
         raise ValueError(f"Wrong WP2 intervention label: {label}")
@@ -68,9 +71,13 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
     frames = {}
     for stage, objective, objective_value, cap in (
         ("a", "minimize_unserved", record["metrics"]["stage_a_shortfall_kg"], None),
-        ("b", "minimize_cash_cost", record["metrics"]["stage_b_grid_settlement_eur_synthetic_prices"],
-         record["metrics"]["stage_a_shortfall_kg"]
-         + max(1e-4, 1e-8 * record["metrics"]["demand_h2_kg"])),
+        (
+            "b",
+            "minimize_cash_cost",
+            record["metrics"]["stage_b_grid_settlement_eur_synthetic_prices"],
+            record["metrics"]["stage_a_shortfall_kg"]
+            + max(1e-4, 1e-8 * record["metrics"]["demand_h2_kg"]),
+        ),
     ):
         name = f"stage_{stage}.csv"
         path = folder / name
@@ -89,11 +96,19 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
         ):
             raise ValueError(f"Electricity-price input mismatch: {label}/{name}")
         evidence = verify_dispatch(
-            opt, frame, float(objective_value), objective, "hourly",
-            enable_grid=True, enable_storage=True, shortfall_cap_kg=cap,
+            opt,
+            frame,
+            float(objective_value),
+            objective,
+            "hourly",
+            enable_grid=True,
+            enable_storage=True,
+            shortfall_cap_kg=cap,
         )
         if not evidence["passed"]:
-            raise ValueError(f"Independent WP3 re-verification failed: {label}/{name}: {evidence['checks']}")
+            raise ValueError(
+                f"Independent WP3 re-verification failed: {label}/{name}: {evidence['checks']}"
+            )
         if record[f"verification_{stage}"] != evidence["checks"]:
             raise ValueError(f"Verification ledger changed: {label}/{name}")
         frames[stage] = frame
@@ -111,11 +126,14 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
         label=label + " stage B shortfall",
     )
     physical_bound = optimistic_shortfall_lower_bound_kg(
-        opt, a["wind_available_mw"].to_numpy(dtype=float),
-        grid_enabled=True, storage_enabled=True,
+        opt,
+        a["wind_available_mw"].to_numpy(dtype=float),
+        grid_enabled=True,
+        storage_enabled=True,
     )
     _assert_close(
-        physical_bound, record["metrics"]["independent_lower_bound_kg"],
+        physical_bound,
+        record["metrics"]["independent_lower_bound_kg"],
         label=label + " optimistic physical bound",
     )
     if shortfall < physical_bound - 1e-3:
@@ -151,9 +169,7 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
     # binary/ramp/storage charging. Uses the existing WP1 bound definition.
     optimistic_production_kg = float(max_instant_h2.sum() * dt)
     # Production-limited energy deficit after eligible inventory credit.
-    inventory_credit_kg = max(
-        0.0, opt.storage_initial_kg - opt.storage_final_min_kg
-    )
+    inventory_credit_kg = max(0.0, opt.storage_initial_kg - opt.storage_final_min_kg)
     energy_deficit_lb_kg = max(0.0, demand - optimistic_production_kg - inventory_credit_kg)
     _assert_close(energy_deficit_lb_kg, physical_bound, label=label + " energy bound")
     residual_over_bound = shortfall - physical_bound
@@ -177,16 +193,18 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
     months = pd.date_range("2023-01-01", periods=hours, freq="h").month.to_numpy()
     for month in range(1, 13):
         sel = months == month
-        monthly.append({
-            "scenario": label,
-            "month": month,
-            "hours": hours_mask(sel),
-            "unserved_h2_kg_stage_a": float(slip[sel].sum() * dt),
-            "wind_available_mwh": float(source_power[sel].sum() * dt),
-            "grid_import_mwh_stage_a": float(grid_import[sel].sum() * dt),
-            "grid_import_mwh_stage_b": float(stage_b_imp[sel].sum() * dt),
-            "hours_shortfall_stage_a": hours_mask(short & sel),
-        })
+        monthly.append(
+            {
+                "scenario": label,
+                "month": month,
+                "hours": hours_mask(sel),
+                "unserved_h2_kg_stage_a": float(slip[sel].sum() * dt),
+                "wind_available_mwh": float(source_power[sel].sum() * dt),
+                "grid_import_mwh_stage_a": float(grid_import[sel].sum() * dt),
+                "grid_import_mwh_stage_b": float(stage_b_imp[sel].sum() * dt),
+                "hours_shortfall_stage_a": hours_mask(short & sel),
+            }
+        )
 
     stats = {
         "scenario": label,
@@ -226,15 +244,12 @@ def _load_case(source_dir, case, summary_record, source, base_cfg, protocol):
         "simultaneous_import_export_hours_stage_b": hours_mask(
             (stage_b_imp > TOL_MW) & (stage_b_exp > TOL_MW)
         ),
-        "simultaneous_storage_charge_discharge_hours_stage_a": hours_mask(
-            storing & withdrawing
-        ),
+        "simultaneous_storage_charge_discharge_hours_stage_a": hours_mask(storing & withdrawing),
         "simultaneous_storage_charge_discharge_hours_stage_b": hours_mask(
             (stage_b_chg > TOL_H2_KG) & (stage_b_dis > TOL_H2_KG)
         ),
         "stage_b_synthetic_grid_settlement_eur": float(
-            (b["electricity_price"] * (b["grid_import_mw"] - b["grid_export_mw"])).sum()
-            * dt
+            (b["electricity_price"] * (b["grid_import_mw"] - b["grid_export_mw"])).sum() * dt
         ),
         "instantaneous_max_production_less_than_demand_hours": hours_mask(
             max_instant_h2 + TOL_H2_KG < demand_per_hour
@@ -292,9 +307,7 @@ def analyse_archive(source_dir):
         label="baseline contrast",
     )
     for name, observed in contrasts["single_benefits_fraction"].items():
-        _assert_close(
-            observed, original["single_benefits_fraction"][name], label=name + " benefit"
-        )
+        _assert_close(observed, original["single_benefits_fraction"][name], label=name + " benefit")
     for p, q in zip(
         contrasts["pairwise_interactions"], original["pairwise_interactions"], strict=True
     ):
@@ -311,11 +324,11 @@ def analyse_archive(source_dir):
         - (b["annual_unserved_kg_stage_a"] - s["annual_unserved_kg_stage_a"])
     )
     interaction_pp = interaction / b["annual_h2_demand_kg"] * 100
-    original_es = next(
-        x for x in contrasts["pairwise_interactions"] if x["pair"] == "E+S"
+    original_es = next(x for x in contrasts["pairwise_interactions"] if x["pair"] == "E+S")
+    _assert_close(
+        interaction_pp, original_es["interaction_fraction"] * 100, label="E+S interaction"
     )
-    _assert_close(interaction_pp, original_es["interaction_fraction"] * 100,
-                  label="E+S interaction")
+
     focus = {
         "baseline_unavoidable_fraction_of_observed_shortfall": b[
             "bound_fraction_of_observed_shortfall"
@@ -384,35 +397,37 @@ def _markdown(result):
             f"| {row['storage_max_level_kg_stage_a'] / 1000:.2f} |"
         )
     focus = result["research_focus"]
-    lines.extend([
-        "",
-        "## Structural deductions and limitations",
-        "",
-        f"- Baseline: {focus['baseline_unavoidable_fraction_of_observed_shortfall'] * 100:.3f}% "
-        "of its reported unmet hydrogen is at least the independent optimistic "
-        "annual energy-capacity lower bound. This explains **why storage volume "
-        "alone cannot resolve the dominant shortage** in this particular system; "
-        "it does not establish the relative marginal values of technologies.",
-        f"- Storage-only improvement: {focus['storage_only_shortfall_change_kg']:.3f} kg.",
-        f"- Adding storage after electrolyser expansion: "
-        f"{focus['storage_conditional_benefit_after_electrolyser_expansion_kg']:.3f} kg "
-        "additional delivery under the registered assumptions.",
-        f"- E+S finite interaction: "
-        f"{focus['electrolyser_storage_interaction_percentage_points']:+.3f} percentage points.",
-        "- Zero unserved hydrogen in the grid expansion case means the *model* "
-        "meets demand with a larger grid allowance, not that delivered hydrogen "
-        "meets renewable-energy certification or has low life-cycle emissions.",
-        "- Grid/plant/storage cap counts are overlapping **co-occurrences** "
-        "with shortfall, not independent causes or statistically identified effects.",
-        "- The dataset has one ERA5-derived weather year and synthetic prices. "
-        "Negative net settlement is not project profitability.",
-        "",
-        "## Import/export and storage circulation diagnostics",
-        "",
-        "| Scenario | Simultaneous grid exchange Stage A / B hours "
-        "| Simultaneous charge/discharge Stage A / B hours |",
-        "|---|---:|---:|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Structural deductions and limitations",
+            "",
+            f"- Baseline: {focus['baseline_unavoidable_fraction_of_observed_shortfall'] * 100:.3f}% "
+            "of its reported unmet hydrogen is at least the independent optimistic "
+            "annual energy-capacity lower bound. This explains **why storage volume "
+            "alone cannot resolve the dominant shortage** in this particular system; "
+            "it does not establish the relative marginal values of technologies.",
+            f"- Storage-only improvement: {focus['storage_only_shortfall_change_kg']:.3f} kg.",
+            f"- Adding storage after electrolyser expansion: "
+            f"{focus['storage_conditional_benefit_after_electrolyser_expansion_kg']:.3f} kg "
+            "additional delivery under the registered assumptions.",
+            f"- E+S finite interaction: "
+            f"{focus['electrolyser_storage_interaction_percentage_points']:+.3f} percentage points.",
+            "- Zero unserved hydrogen in the grid expansion case means the *model* "
+            "meets demand with a larger grid allowance, not that delivered hydrogen "
+            "meets renewable-energy certification or has low life-cycle emissions.",
+            "- Grid/plant/storage cap counts are overlapping **co-occurrences** "
+            "with shortfall, not independent causes or statistically identified effects.",
+            "- The dataset has one ERA5-derived weather year and synthetic prices. "
+            "Negative net settlement is not project profitability.",
+            "",
+            "## Import/export and storage circulation diagnostics",
+            "",
+            "| Scenario | Simultaneous grid exchange Stage A / B hours "
+            "| Simultaneous charge/discharge Stage A / B hours |",
+            "|---|---:|---:|",
+        ]
+    )
     for row in result["case_diagnostics"]:
         lines.append(
             f"| {row['scenario']} | "
@@ -421,18 +436,20 @@ def _markdown(result):
             f"{row['simultaneous_storage_charge_discharge_hours_stage_a']} / "
             f"{row['simultaneous_storage_charge_discharge_hours_stage_b']} |"
         )
-    lines.extend([
-        "",
-        "## Provenance",
-        "",
-        f"- Source archive summary SHA-256: \`{result['wp2_summary_sha256']}\`",
-        f"- Registered WP2 protocol SHA-256: \`{result['registered_protocol_sha256']}\`",
-        f"- Parent source revision reported by WP2: \`{result['wp2_source_commit']}\`",
-        "- Each archived stage CSV, YAML and verification ledger was checked against "
-        "the archived record and the unchanged registered source inputs.",
-        "- Monthly scenario data and all statistics are machine-readable in "
-        "\`monthly.csv\`, \`diagnostics.csv\` and \`analysis.json\`.",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Provenance",
+            "",
+            f"- Source archive summary SHA-256: \`{result['wp2_summary_sha256']}\`",
+            f"- Registered WP2 protocol SHA-256: \`{result['registered_protocol_sha256']}\`",
+            f"- Parent source revision reported by WP2: \`{result['wp2_source_commit']}\`",
+            "- Each archived stage CSV, YAML and verification ledger was checked against "
+            "the archived record and the unchanged registered source inputs.",
+            "- Monthly scenario data and all statistics are machine-readable in "
+            "\`monthly.csv\`, \`diagnostics.csv\` and \`analysis.json\`.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -448,16 +465,11 @@ def main(argv=None):
     (args.output / "analysis.json").write_text(
         json.dumps(analysis, sort_keys=True, indent=2, allow_nan=False) + "\n",
         encoding="utf-8",
+
     )
-    pd.DataFrame(analysis["case_diagnostics"]).to_csv(
-        args.output / "diagnostics.csv", index=False
-    )
-    pd.DataFrame(analysis["monthly_diagnostics"]).to_csv(
-        args.output / "monthly.csv", index=False
-    )
-    (args.output / "RESEARCH_FINDINGS.md").write_text(
-        _markdown(analysis), encoding="utf-8"
-    )
+    pd.DataFrame(analysis["case_diagnostics"]).to_csv(args.output / "diagnostics.csv", index=False)
+    pd.DataFrame(analysis["monthly_diagnostics"]).to_csv(args.output / "monthly.csv", index=False)
+    (args.output / "RESEARCH_FINDINGS.md").write_text(_markdown(analysis), encoding="utf-8")
     f = analysis["research_focus"]
     print(
         "WP3 VERIFIED: "
