@@ -134,7 +134,12 @@ def fetch_entsoe_prices(
     try:
         client = EntsoePandasClient(api_key=api_key)
     except Exception as exc:
-        raise RuntimeError(f"ENTSO-E client could not be created: {exc}") from exc
+        # Upstream exceptions can contain the request URL or API token.
+        # Preserve only its type in user-facing errors and CI logs.
+        raise RuntimeError(
+            f"ENTSO-E client could not be created ({type(exc).__name__}); "
+            "provider details suppressed to protect API credentials"
+        ) from None
 
     start = pd.Timestamp(start_date, tz=timezone_name)
     end = pd.Timestamp(end_date, tz=timezone_name) + pd.Timedelta(days=1)
@@ -143,8 +148,9 @@ def fetch_entsoe_prices(
         prices = client.query_day_ahead_prices(bidding_zone, start=start, end=end)
     except Exception as exc:
         raise RuntimeError(
-            f"ENTSO-E query failed for {bidding_zone} {start_date}..{end_date}: {exc}"
-        ) from exc
+            f"ENTSO-E query failed for {bidding_zone} {start_date}..{end_date} "
+            f"({type(exc).__name__}); provider details suppressed to protect API credentials"
+        ) from None
 
     request_metadata = {
         "bidding_zone": bidding_zone,

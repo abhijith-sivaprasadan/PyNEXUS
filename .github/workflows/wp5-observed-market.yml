@@ -1,0 +1,130 @@
+name: WP5 Netherlands 2023 observed-price acquisition
+
+# Manual only: no untrusted PR can receive ENTSOE_API_KEY.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Fetch prices only, verify short dispatch, or solve a full-year case"
+        required: true
+        type: choice
+        default: prices-only
+        options:
+          - prices-only
+          - smoke-24h
+          - annual-selected
+      scenario:
+        description: "Registered intervention for the dispatch (ignored for prices-only)"
+        required: true
+        type: choice
+        default: baseline
+        options:
+          - baseline
+          - E
+          - E+S
+          - G
+          - S
+          - W
+          - eta
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp5-observed-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    name: Retrieve and validate official NL 2023 day-ahead prices
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install reproducible price adapter and test dependencies
+        run: python -m pip install -e '.[data,dev]'
+      - name: Ensure repository API secret has been configured
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$ENTSOE_API_KEY" ]]; then
+            echo "::error::ENTSOE_API_KEY repository secret is missing. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+      - name: Run strict UTC/DST and credential-safe regression tests
+        run: python -m pytest -q tests/test_research_wp5_market.py tests/test_entsoe.py tests/test_entsoe_secret_safety.py
+      - name: Fetch A44 price series for Netherlands and validate exact UTC coverage
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: python -m research.wp5_market fetch --output wp5-nl-2023-market-prices
+      - name: Verify saved 2023 evidence is loadable and hash consistent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from research.wp5_market import load_snapshot
+          data, manifest = load_snapshot(Path("wp5-nl-2023-market-prices"))
+          assert len(data) == 8760
+          print("Verified 2023 NL A44 processed snapshot: 8760 unique UTC hours.")
+          print("SHA-256:", manifest["csv_sha256"])
+          print("Provider raw XML archived:", manifest["provider_response_xml_archived"])
+          print("Negative-price hours:", manifest["negative_price_hours"])
+          PY
+      - name: Upload processed-price provenance and time series
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp5-nl-2023-processed-a44-prices
+          path: wp5-nl-2023-market-prices/
+          if-no-files-found: error
+          retention-days: 60
+
+  dispatch:
+    name: Verify ${{ inputs.mode }} redispatch, scenario ${{ inputs.scenario }}
+    if: inputs.mode != 'prices-only'
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      MODE: ${{ inputs.mode }}
+      SCENARIO: ${{ inputs.scenario }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install solver and research dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Download same-run verified processed-price snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: wp5-nl-2023-processed-a44-prices
+          path: wp5-nl-2023-market-prices
+      - name: Re-solve Stage A and B with observed hourly price inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            smoke-24h) HOURS=24 ;;
+            annual-selected) HOURS=8760 ;;
+            *) echo "::error::Unsupported run mode"; exit 1 ;;
+          esac
+          python -m research.wp5_market dispatch \
+            --snapshot wp5-nl-2023-market-prices \
+            --scenario "$SCENARIO" \
+            --hours "$HOURS" \
+            --time-limit 900 \
+            --output wp5-nl-2023-redispatch
+      - name: Archive individually verified Stage A/B dispatch and manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp5-nl-2023-${{ inputs.mode }}-${{ inputs.scenario }}-redispatch
+          path: wp5-nl-2023-redispatch/
+          if-no-files-found: warn
+          retention-days: 60
