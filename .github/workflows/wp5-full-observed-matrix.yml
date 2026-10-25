@@ -1,0 +1,90 @@
+name: WP5 complete 17-case observed 2023 price matrix
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wp5-full-observed-matrix.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: wp5-full-observed-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  annual:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        case: [baseline, W, E, G, S, eta, W+E, W+G, W+S, W+eta, E+G, E+S, E+eta, G+S, G+eta, S+eta, all]
+    name: "NL 2023 A44 observed | ${{ matrix.case }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Fetch exact previously audited processed 2023 A44 prices without API access
+        uses: actions/download-artifact@v4
+        with:
+          name: wp5-nl-2023-processed-a44-prices
+          run-id: 40205807892
+          github-token: ${{ github.token }}
+          path: wp5-nl-2023-price-snapshot
+      - name: Verify calendar, source hash and price-only economics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from research.wp5_market import load_snapshot
+          prices, manifest = load_snapshot(Path("wp5-nl-2023-price-snapshot"))
+          assert len(prices) == 8760
+          assert manifest["csv_sha256"] == "2dfea4651fce314893201e7b08a4ae0ad24deef6b69ef85d81d9f54428f95bb2"
+          PY
+      - name: Solve both annual optimisation stages with real 2023 prices
+        run: |
+          python -m research.wp5_market dispatch \
+            --snapshot wp5-nl-2023-price-snapshot \
+            --scenario "${{ matrix.case }}" \
+            --hours 8760 --time-limit 1800 \
+            --output "wp5-2023-${{ matrix.case }}"
+      - name: Retain independently verified full-year result and price provenance
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp5-observed-full-year-${{ matrix.case }}
+          path: wp5-2023-${{ matrix.case }}/
+          retention-days: 60
+          if-no-files-found: warn
+  synthesis:
+    if: always()
+    needs: annual
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e '.[dev]'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wp5-observed-full-year-*
+          path: wp5-annual-artifacts
+      - name: Reject incomplete matrix and create auditable adequacy/wholesale comparison
+        run: |
+          python -m research.batch_evidence wp5 \
+            --input wp5-annual-artifacts --output wp5-observed-full-matrix
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp5-observed-2023-full-17-case-synthesis
+          path: wp5-observed-full-matrix/
+          if-no-files-found: warn
+          retention-days: 60
