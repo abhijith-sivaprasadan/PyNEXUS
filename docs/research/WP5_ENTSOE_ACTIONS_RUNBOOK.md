@@ -61,6 +61,42 @@ Inspect `missing_exact_hour_count`, `first_missing_exact_hours_utc`,
 will expose repeated 15-minute intervals and off-hour timestamps instead of
 being silently averaged into hourly observations.
 
+### Evidence-based one-hour requery for the observed December 2023 anomaly
+
+The owner's 2026-10-25 live `prices-only` run, ID `40204281501`, established
+that ENTSO-E's year-spanning PandasClient response contains exactly 8,759
+2023 UTC hours. Only **2023-12-29 23:00 UTC / 2023-12-30 00:00 CET** is missing;
+there are no duplicates or off-grid timestamps, and the adjacent interval
+spans 120 minutes. API authorization, data units and general timezone
+conversion are working. The underlying provider-vs-parser cause remains
+unconfirmed.
+
+The refreshed workflow **does not interpolate that hour**. If and only if
+this single registered gap is present, the fetcher requests the official
+Netherlands A44 series independently for local dates
+`2023-12-29` through `2023-12-31`. It accepts the missing hour only when:
+
+1. The second A44 response contains an explicit, finite hourly observation
+   at the missing UTC timestamp.
+2. The adjacent control hours and at least 12 overlapping prices are present.
+3. **Every** overlapping observation agrees with the year-spanning response
+   to within 0.000001 EUR/MWh.
+4. The stitched series then independently passes the original strict
+   8,760-hour UTC check without resampling.
+
+Successful archives preserve the complete independent query as
+`independent_a44_targeted_observations.csv`, its checksum and the exact
+recovered price/time and overlap audit in `manifest.json`. The status is
+still *processed provider time series*, **not original raw XML**.
+
+If the second response also omits the price, has inconsistent prices, or
+cannot be retrieved, the original strict failure remains. Inspect the
+uploaded diagnostic before attempting another source interpretation. An
+A03 compressed curve may encode repeated values implicitly; no such
+source-defined reconstruction has been added without inspection of the
+original ENTSO-E XML. A query failure is not evidence that the true market
+price is equal to a neighboring price.
+
 If the source is incomplete, source retrieval needs correction or an
 independently documented and permitted alternative. If the source truly
 uses 15- or 30-minute market time units, a **separate, explicitly
