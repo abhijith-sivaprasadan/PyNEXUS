@@ -148,9 +148,7 @@ def validate_synthesis(result, demand_per_day_kg):
             )
         lookup = {r["scenario"]: r["unserved_fraction"] for r in rows}
         conditional = 100 * (lookup["E"] - lookup["E+S"])
-        interaction = 100 * (
-            lookup["E"] + lookup["S"] - lookup["baseline"] - lookup["E+S"]
-        )
+        interaction = 100 * (lookup["E"] + lookup["S"] - lookup["baseline"] - lookup["E+S"])
         _near(
             _finite(metric["storage_conditional_benefit_after_E_pp"], "conditional E+S"),
             conditional,
@@ -215,9 +213,7 @@ def build_iamc_rows(synthesis, demand_per_day_kg, definitions):
             "adequacy_benefit_vs_baseline": row["benefit_percentage_points"],
         }
         if scenario == "E+S":
-            values["electrolyser_storage_interaction"] = year_meta[year][
-                "E_plus_S_interaction_pp"
-            ]
+            values["electrolyser_storage_interaction"] = year_meta[year]["E_plus_S_interaction_pp"]
         for key, value in values.items():
             definition = names[key]
             records.append(
