@@ -219,6 +219,7 @@ class ElectrolyzerDispatchOptimizer:
         enable_heat: bool = False,
         heat_demand_mw: np.ndarray = None,
         shortfall_cap_kg: float | None = None,
+        grid_exchange_mode: str = "legacy",
     ) -> dict:
         """
         Run MILP optimization.
@@ -284,6 +285,12 @@ class ElectrolyzerDispatchOptimizer:
             raise ValueError("wind_power_mw must be non-negative")
         if demand_mode not in {"hourly", "cumulative"}:
             raise ValueError(f"Unknown demand_mode: {demand_mode}")
+        if grid_exchange_mode not in {"legacy", "exclusive"}:
+            raise ValueError("grid_exchange_mode must be legacy or exclusive")
+        if grid_exchange_mode == "exclusive" and (
+            not enable_grid or objective not in {"minimize_unserved", "minimize_cash_cost"}
+        ):
+            raise ValueError("Exclusive grid exchange requires a grid-enabled research objective")
         if objective in {"minimize_unserved", "minimize_cash_cost"}:
             if demand_mode != "hourly":
                 raise ValueError("Research objectives require hourly demand mode")
@@ -352,6 +359,21 @@ class ElectrolyzerDispatchOptimizer:
                 )
 
             model.c_grid_balance = pyo.Constraint(model.T, rule=grid_balance)
+            if grid_exchange_mode == "exclusive":
+                # Physical sign of net exchange is unambiguous even at
+                # negative prices or with degenerate Stage A solutions.
+                # Default remains legacy for byte-identical historical studies.
+                model.grid_import_mode = pyo.Var(model.T, domain=pyo.Binary)
+                model.c_grid_import_exclusive = pyo.Constraint(
+                    model.T,
+                    rule=lambda m, t: m.g_imp[t] <= self.grid_connection_mw * m.grid_import_mode[t],
+                )
+                model.c_grid_export_exclusive = pyo.Constraint(
+                    model.T,
+                    rule=lambda m, t: (
+                        m.g_exp[t] <= self.grid_connection_mw * (1 - m.grid_import_mode[t])
+                    ),
+                )
         else:
 
             def wind_limit(model, t):
@@ -730,6 +752,7 @@ class ElectrolyzerDispatchOptimizer:
             "results_df": results_df,
             "enable_storage": enable_storage,
             "enable_grid": enable_grid,
+            "grid_exchange_mode": grid_exchange_mode,
             "enable_heat": enable_heat,
             "objective_definition": {
                 "minimize_cost": "legacy_electricity_plus_grid_and_shortfall_penalty",

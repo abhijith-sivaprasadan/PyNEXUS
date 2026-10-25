@@ -23,6 +23,7 @@ def solve_adequacy_first(
     *,
     enable_storage=True,
     numerical_slack_kg=None,
+    grid_exchange_mode="legacy",
 ):
     """Return independently verified Stage A and Stage B dispatch results.
 
@@ -40,7 +41,12 @@ def solve_adequacy_first(
     if optimiser.mip_gap > 1e-4:
         raise ValueError("Research adequacy solves require mip_rel_gap <= 1e-4")
 
-    common = dict(demand_mode="hourly", enable_grid=True, enable_storage=enable_storage)
+    common = dict(
+        demand_mode="hourly",
+        enable_grid=True,
+        enable_storage=enable_storage,
+        grid_exchange_mode=grid_exchange_mode,
+    )
     stage_a = optimiser.optimize(wind, prices, objective="minimize_unserved", **common)
     if stage_a["status"] != "optimal":
         raise RuntimeError(f"Stage A did not solve to reported optimality: {stage_a['status']}")
@@ -106,6 +112,15 @@ def solve_adequacy_first(
     final_unserved = float(stage_b["results_df"]["demand_slack_kg_h"].sum() * optimiser.dt)
     if final_unserved > cap + 1e-5:
         raise RuntimeError("Stage B exceeded the declared adequacy allowance")
+    if grid_exchange_mode == "exclusive":
+        for label, stage in (("A", stage_a), ("B", stage_b)):
+            df = stage["results_df"]
+            overlap = np.minimum(
+                df["grid_import_mw"].to_numpy(dtype=float),
+                df["grid_export_mw"].to_numpy(dtype=float),
+            )
+            if np.any(overlap > 1e-6):
+                raise RuntimeError(f"Exclusive grid mode violated by Stage {label}")
     return {
         "total_demand_kg": total_demand,
         "optimistic_shortfall_lower_bound_kg": lower_bound,
@@ -118,5 +133,6 @@ def solve_adequacy_first(
         "stage_b": stage_b,
         "verification_a": verified_a,
         "verification_b": verified_b,
+        "grid_exchange_mode": grid_exchange_mode,
         "economics_scope": "net grid imports less exports only; excludes wind CAPEX/OPEX",
     }
