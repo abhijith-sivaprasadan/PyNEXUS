@@ -3,6 +3,7 @@
 The 2023 Stage B electricity prices are SYNTHETIC. These are NOT LCOH,
 commercial breakeven prices, measured hydrogen revenue, or net benefits.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,8 +46,7 @@ def calculate_thresholds(summary):
     base, s, e, es = (cases[key] for key in ("baseline", "S", "E", "E+S"))
     demand = _metric(e, "demand_h2_kg")
     if demand <= 0 or any(
-        not np.isclose(_metric(c, "demand_h2_kg"), demand, atol=1e-5, rtol=0)
-        for c in (base, s, es)
+        not np.isclose(_metric(c, "demand_h2_kg"), demand, atol=1e-5, rtol=0) for c in (base, s, es)
     ):
         raise ValueError("Compared scenarios must have identical positive annual demand")
     for c in (base, s, e, es):
@@ -71,9 +71,7 @@ def calculate_thresholds(summary):
         raise ValueError("No extra delivery: ratio undefined and no economic claim allowed")
     if not np.isclose(delta_kg, stage_a_improvement_kg, atol=1.0, rtol=0):
         raise ValueError("Stage A vs Stage B adequacy differences unexpectedly large")
-    no_storage_gain_kg = _metric(base, "stage_a_shortfall_kg") - _metric(
-        s, "stage_a_shortfall_kg"
-    )
+    no_storage_gain_kg = _metric(base, "stage_a_shortfall_kg") - _metric(s, "stage_a_shortfall_kg")
     return {
         "schema_version": "pynexus.wp5.marginal_thresholds.v1",
         "status": "PHYSICAL_DELIVERY_AND_SYNTHETIC_SETTLEMENT_ONLY",
@@ -118,9 +116,15 @@ def main(argv=None):
     (args.output / "analysis.json").write_text(
         json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
     )
-    pd.DataFrame([{
-        k: v for k, v in result.items() if isinstance(v, (int, float)) and not isinstance(v, bool)
-    }]).to_csv(args.output / "thresholds.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                k: v
+                for k, v in result.items()
+                if isinstance(v, (int, float)) and not isinstance(v, bool)
+            }
+        ]
+    ).to_csv(args.output / "thresholds.csv", index=False)
     print("WP5 physical threshold reproduced; SYNTHETIC settlement, no sourced costs.")
     return 0
 
