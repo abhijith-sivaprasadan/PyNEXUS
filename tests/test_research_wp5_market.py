@@ -9,6 +9,7 @@ import pytest
 from research.wp5_market import (
     END,
     EXPECTED,
+    GAP_2023_UTC,
     START,
     TIME_COLUMN,
     fetch_official_snapshot,
@@ -16,6 +17,7 @@ from research.wp5_market import (
     normalise_hourly_prices,
     parse_snapshot_csv,
     price_coverage_diagnostics,
+    recover_from_independent_a44_query,
     write_snapshot,
 )
 
@@ -179,3 +181,94 @@ def test_valid_provider_calendar_writes_only_verified_prices(monkeypatch, tmp_pa
     assert result["row_count"] == 8760
     assert not diagnostics_dir.exists()
     assert (source / "prices.csv").is_file()
+
+
+def test_independent_a44_source_requery_restores_exact_missing_observation(tmp_path, monkeypatch):
+    import research.wp5_market as market
+
+    master = synthetic_utc_prices()
+    original = master.drop(GAP_2023_UTC).tz_convert("Europe/Amsterdam")
+    targeted = master.loc["2023-12-29":"2023-12-31"].tz_convert("Europe/Amsterdam")
+    calls = []
+
+    def fake_provider(zone, start, end, timezone):
+        calls.append((zone, start, end, timezone))
+        if start == "2022-12-31":
+            return original, META
+        return targeted, META
+
+    monkeypatch.setattr(market, "fetch_entsoe_prices", fake_provider)
+    out = tmp_path / "verified"
+    result = fetch_official_snapshot(out, diagnostics_dir=tmp_path / "failure")
+    assert len(calls) == 2
+    assert calls[1] == ("NL", "2023-12-29", "2023-12-31", "Europe/Amsterdam")
+    recovery = result["verified_source_gap_recovery"]
+    assert recovery["recovered_observation_count"] == 1
+    assert recovery["status"].startswith("RECOVERED_EXPLICITLY_OBSERVED")
+    assert recovery["independent_overlap_hour_count"] >= 12
+    assert recovery["maximum_overlap_price_difference_eur_mwh"] == 0
+    assert recovery["price_interpolation_or_forward_fill"] is False
+    assert "supplementary_a44_request" in result["provider_request"]
+    assert (out / "independent_a44_targeted_observations.csv").exists()
+    assert not (tmp_path / "failure").exists()
+    data, verified = load_snapshot(out)
+    observed = data.loc[data[TIME_COLUMN] == "2023-12-29T23:00:00Z", "price_eur_mwh"]
+    assert len(observed) == 1
+    assert observed.iloc[0] == pytest.approx(master.loc[GAP_2023_UTC])
+    assert verified["verified_source_gap_recovery"] == recovery | {
+        "independent_targeted_observations_sha256": recovery[
+            "independent_targeted_observations_sha256"
+        ]
+    }
+
+
+def test_independent_requery_rejects_conflicting_overlap():
+    source = synthetic_utc_prices()
+    annual = source.drop(GAP_2023_UTC)
+    targeted = source.loc["2023-12-29":"2023-12-31"].copy()
+    targeted.iloc[0] += 0.01
+    with pytest.raises(ValueError, match="disagree"):
+        recover_from_independent_a44_query(annual, targeted)
+
+
+def test_independent_requery_rejects_missing_target_hour():
+    source = synthetic_utc_prices()
+    annual = source.drop(GAP_2023_UTC)
+    targeted = source.loc["2023-12-29":"2023-12-31"].drop(GAP_2023_UTC)
+    with pytest.raises(ValueError, match="did not return"):
+        recover_from_independent_a44_query(annual, targeted)
+
+
+def test_independent_requery_rejects_gap_elsewhere():
+    source = synthetic_utc_prices()
+    annual = source.drop(EXPECTED[151])
+    targeted = source.loc["2023-12-29":"2023-12-31"]
+    with pytest.raises(ValueError, match="registered"):
+        recover_from_independent_a44_query(annual, targeted)
+
+
+def test_failed_official_requery_keeps_research_gate_closed(tmp_path, monkeypatch):
+    import json
+
+    import research.wp5_market as market
+
+    master = synthetic_utc_prices()
+    original = master.drop(GAP_2023_UTC)
+    calls = []
+
+    def fake_provider(zone, start, end, timezone):
+        calls.append((start, end))
+        if start == "2022-12-31":
+            return original, META
+        return original.loc["2023-12-29":"2023-12-31"], META
+
+    monkeypatch.setattr(market, "fetch_entsoe_prices", fake_provider)
+    with pytest.raises(ValueError, match="Missing/extra"):
+        fetch_official_snapshot(
+            tmp_path / "must_not_exist", diagnostics_dir=tmp_path / "diagnostics"
+        )
+    assert len(calls) == 2
+    assert not (tmp_path / "must_not_exist").exists()
+    diagnosis = json.loads((tmp_path / "diagnostics/coverage_diagnostics.json").read_text())
+    assert diagnosis["missing_exact_hour_count"] == 1
+    assert diagnosis["independent_a44_requery_outcome"].startswith("REJECTED_ValueError")
