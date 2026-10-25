@@ -41,6 +41,37 @@ adapter and does not archive the original A44 XML; this run is processed-data
 provenance only. Its stored archive is a GitHub Actions artifact with 60-day
 retention, **not** a DOI-backed permanent research deposit.
 
+## If the ENTSO-E price validation step fails
+
+The first live A44 request in October 2026 returned a price series, but the
+strict 8,760-hour UTC calendar gate rejected it with a generic
+"Missing/extra or nonhourly records" message. **The source of the mismatch is
+not yet established.** Authentication appears to have worked; do not rotate
+the token solely because of this failure.
+
+The updated fetch step prints a sanitized JSON diagnosis of the **actual**
+provider timestamps and writes
+`wp5-nl-2023-rejected-calendar-diagnostics/coverage_diagnostics.json`.
+On a failed fetch, GitHub uploads that file under
+`wp5-nl-2023-REJECTED-unverified-calendar-diagnostics`.
+
+Inspect `missing_exact_hour_count`, `first_missing_exact_hours_utc`,
+`unexpected_in_year_timestamp_count`, and
+`successive_interval_minutes_counts`. For example, a 15-minute price series
+will expose repeated 15-minute intervals and off-hour timestamps instead of
+being silently averaged into hourly observations.
+
+If the source is incomplete, source retrieval needs correction or an
+independently documented and permitted alternative. If the source truly
+uses 15- or 30-minute market time units, a **separate, explicitly
+registered transformation** must be specified, justified, provenance-logged,
+and tested before any hourly dispatch comparison. Never interpolate missing
+market hours or claim that rejected diagnostics establish real-price results.
+
+Re-run the manual workflow with `mode = prices-only` after the diagnostic
+fix is merged. Send the workflow run URL or the **sanitized diagnostic file**,
+never the ENTSO-E API token, for triage.
+
 ## 3. Test or execute physical dispatch under observed prices
 
 Re-run the same workflow on `main` using a new execution mode:
