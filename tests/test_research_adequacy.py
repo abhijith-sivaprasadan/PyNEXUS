@@ -124,7 +124,6 @@ def test_adequacy_wrapper_fails_on_unacceptable_gap():
         solve_adequacy_first(o, [100.0], [10.0], enable_storage=False)
 
 
-
 def test_exclusive_grid_mode_guarantees_no_simultaneous_exchange_at_negative_prices():
     o = opt()
     run = solve_adequacy_first(
@@ -141,16 +140,17 @@ def test_exclusive_grid_mode_guarantees_no_simultaneous_exchange_at_negative_pri
         assert result["grid_exchange_mode"] == "exclusive"
         assert result["status"] == "optimal"
         assert result["binary_variables"] >= 2 * len(df)
-        assert np.max(
-            np.minimum(df["grid_import_mw"], df["grid_export_mw"])
-        ) <= 1e-6
+        assert np.max(np.minimum(df["grid_import_mw"], df["grid_export_mw"])) <= 1e-6
     assert run["verification_a"]["passed"] and run["verification_b"]["passed"]
 
 
 def test_grid_mode_is_opt_in_and_cannot_relabel_legacy_objective():
     o = opt()
     old = o.optimize(
-        [70.0], [5.0], objective="minimize_unserved", demand_mode="hourly",
+        [70.0],
+        [5.0],
+        objective="minimize_unserved",
+        demand_mode="hourly",
         enable_grid=True,
     )
     assert old["grid_exchange_mode"] == "legacy"
@@ -160,6 +160,9 @@ def test_grid_mode_is_opt_in_and_cannot_relabel_legacy_objective():
         o.optimize([70.0], [5.0], grid_exchange_mode="exclusive", enable_grid=True)
     with pytest.raises(ValueError, match="grid-enabled"):
         o.optimize(
-            [70.0], [5.0], objective="minimize_unserved",
-            demand_mode="hourly", grid_exchange_mode="exclusive",
+            [70.0],
+            [5.0],
+            objective="minimize_unserved",
+            demand_mode="hourly",
+            grid_exchange_mode="exclusive",
         )
