@@ -75,9 +75,7 @@ def test_cross_case_price_hash_mismatch_rejects_all_wp5_results(tmp_path, monkey
 def test_wp5_manifest_reuses_historical_all_case_only_if_exact_and_verified():
     names = batch_evidence.expected_names("wp5")
     rec = {"scenario": "all", "status": "VERIFIED_TWO_STAGE_SOLVE"}
-    cases = [
-        {"scenario": name, "status": "VERIFIED_TWO_STAGE_SOLVE"} for name in names
-    ]
+    cases = [{"scenario": name, "status": "VERIFIED_TWO_STAGE_SOLVE"} for name in names]
     manifest = {"cases": cases}
     assert (
         batch_evidence._wp5_manifest_case_mode(manifest, "all", rec)
@@ -98,8 +96,7 @@ def test_wp5_manifest_reuses_historical_all_case_only_if_exact_and_verified():
 def test_wp5_manifest_single_case_rejects_wrong_embedded_record():
     rec = {"scenario": "E", "status": "VERIFIED_TWO_STAGE_SOLVE"}
     assert (
-        batch_evidence._wp5_manifest_case_mode({"cases": [rec]}, "E", rec)
-        == "ONE_REGISTERED_CASE"
+        batch_evidence._wp5_manifest_case_mode({"cases": [rec]}, "E", rec) == "ONE_REGISTERED_CASE"
     )
     assert batch_evidence._wp5_manifest_case_mode({"cases": [rec]}, "S", rec) is None
     assert (
