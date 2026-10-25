@@ -43,8 +43,10 @@ def xml_summary(raw):
     rootname = root.tag.split("}")[-1]
     if rootname != "Publication_MarketDocument":
         raise ValueError("ENTSO-E did not return a Publication_MarketDocument")
+
     def texts(local_name):
         return [node.text for node in root.iter() if node.tag.split("}")[-1] == local_name]
+
     doc_types = texts("type")
     if "A44" not in doc_types:
         raise ValueError("ENTSO-E raw document does not declare A44")
@@ -55,7 +57,8 @@ def xml_summary(raw):
     resolutions = sorted(set(texts("resolution")))
     point_positions = [
         elem.text
-        for ts in timeseries for point in ts.iter()
+        for ts in timeseries
+        for point in ts.iter()
         if point.tag.split("}")[-1] == "position"
         for elem in [point]
     ]
@@ -85,6 +88,7 @@ def fetch_raw_year(output, *, api_key=None, client=None):
         if not token or not token.strip():
             raise ValueError("ENTSOE_API_KEY repository secret is required")
         from entsoe import EntsoeRawClient
+
         client = EntsoeRawClient(api_key=token)
     output.mkdir(parents=True, exist_ok=False)
     request_manifest = {
@@ -119,14 +123,16 @@ def fetch_raw_year(output, *, api_key=None, client=None):
             name = f"NL_A44_{year}{month:02d}.xml"
             target = output / name
             target.write_bytes(data)
-            request_manifest["segments"].append({
-                "file": name,
-                "start_local": start.isoformat(),
-                "end_local_exclusive": end.isoformat(),
-                "sha256": hashlib.sha256(data).hexdigest(),
-                "bytes": len(data),
-                **summary,
-            })
+            request_manifest["segments"].append(
+                {
+                    "file": name,
+                    "start_local": start.isoformat(),
+                    "end_local_exclusive": end.isoformat(),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "bytes": len(data),
+                    **summary,
+                }
+            )
         request_manifest["status"] = "RAW_A44_SOURCE_ARCHIVED_WITHOUT_INTERPRETATION"
         return request_manifest
     finally:
