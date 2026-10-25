@@ -108,9 +108,46 @@ The solver solution satisfies the modelled conditions under recorded tolerances,
 
 The reproducible primary manuscript remains grounded in the frozen synthetic-price WP2 and WP4 scenario archives. **New, separately audited 2023 A44 follow-up evidence** verifies historical wholesale-price-based baseline, E and E+S dispatch, and the E-to-E+S marginal storage grid-settlement component. The numbers and scope are documented in [WP5 observed-price research findings](https://github.com/abhijith-sivaprasadan/PyNEXUS/blob/main/docs/research/WP5_OBSERVED_PRICE_2023_E_VS_ES.md); they are **not imported as extra original-WP2 observations or a completed capital-inclusive frontier**. The optional exclusive buy/sell MILP constraints and grid-emissions reporting boundary introduced later also do not retroactively apply to archived original runs. None of these software additions imply real-plant validation, a fully costed commercial technology choice, or an independently peer-reviewed manuscript.
 
-### 4.5. Limitations and research priorities
+### 4.5. Independent NL 2023 source equivalence and interim economics
 
-Key limitations are: (1) stylised fixed capacity interventions without vendor engineering endorsement; (2) 17 cases rather than a complete five-factor factorial, with no systematic higher-order attribution; (3) one point weather source and five consecutive years, without confidence intervals; (4) synthetic Stage B prices for the *primary* WP2/WP4 runs; separately acquired and verified processed Netherlands A44 prices for only baseline, E and E+S, without original source XML archival or tariffs; (5) no investment, replacement, degradation or finance validation; (6) missing grid-access, hydrogen certification and carbon-emissions counterfactual; (7) no independently observed plant data; (8) no independent scientific peer review; and (9) dependence on ephemeral hosted artifacts, mitigated by local byte hashes but requiring long-term archival before Actions retention expiry.
+After the original WP2/WP4 experiments were archived, the NL 2023 day-ahead
+series was retrieved from ENTSO-E's Transparency Platform, with all 8,760
+hourly processed prices independently reproduced **exactly** from 14 original
+A44 XML provider responses using the documented A03 variable-sized-block
+rules. The 2023 electricity price mean was €95.82/MWh and 315 price hours
+were negative. The original year-spanning client returned 8,759 hourly
+observations and omitted **2023-12-29 23:00 UTC**; a separate XML A03
+compressed period at **2023-12-30 08:00 UTC** must not be misidentified
+as the same timestamp. Full source and parser limitations are documented
+in the [WP1 original-price evidence report](WP1_2023_A03_PRIMARY_SOURCE_EQUIVALENCE.md).
+
+Against these observed electricity prices, a separately modelled 125 MW
+electrolyser configuration with 20 t hydrogen storage (E) fulfils 89.51% of
+configured hydrogen demand, while doubling storage to 40 t (E+S) fulfils
+91.39%. The difference is approximately **343.79 additional tonnes
+delivered**, at **€1.759 million additional annual net wholesale grid
+settlement**, or **€5.12 per additional kilogram** for the wholesale
+settlement component alone. Most of the grid-settlement increase relates to
+reduced opportunities to export electricity. This observation is
+**not LCOH, total annual system cost, a proven storage profit/loss or a
+vendor-calibrated design**. Capital, O&M, network tariffs and hydrogen
+offtake price remain unpriced in the observed-price runs. Source:
+[WP5 observed-price E/E+S evidence](WP5_OBSERVED_PRICE_2023_E_VS_ES.md).
+
+Full 17-case observed-price and single-factor engineering robustness
+workflows have subsequently been added, but their **outputs are not
+part of this manuscript until all registered annual cases have passed
+independent verification and been archived**. The investment cost evidence
+register and conditional observed-price accounting module likewise do
+not establish a complete 17-case economic frontier without validated
+2023-EUR coefficients and equipment scope. Literature positioning
+is described in [WP7 literature comparison](WP7_LITERATURE_POSITIONING.md).
+Original 2023 CDS NetCDF provenance, externally durable data deposits
+and independent engineering review remain acceptance gates.
+
+### 4.6. Limitations and research priorities
+
+Key limitations are: (1) stylised fixed capacity interventions without vendor engineering endorsement; (2) 17 cases rather than a complete five-factor factorial, with no systematic higher-order attribution; (3) one point weather source and five consecutive years, without confidence intervals; (4) synthetic Stage B prices for the *primary* WP2/WP4 runs; separately verified observed Netherlands 2023 A44 prices (exactly matched against 14 source XML files) for only baseline, E and E+S, without electricity network tariffs or real procurement contracts; (5) no investment, replacement, degradation or finance validation; (6) missing grid-access, hydrogen certification and carbon-emissions counterfactual; (7) no independently observed plant data; (8) no independent scientific peer review; and (9) dependence on ephemeral hosted artifacts, mitigated by local byte hashes but requiring long-term archival before Actions retention expiry.
 
 Before a journal submission, we recommend: (a) a full 32-case five-factor matrix and finer engineering-relevant sweeps, (b) sensitivity to electrolyser ramp/minimum-load and hydrogen flow-rate limits, (c) location-replicated multi-decade meteorological input with a second independent data processing pipeline, (d) explicitly constrained anti-circulation grid exchange and sensitivity to network permissions, (e) separately sourced engineering/economic model with cost/market reoptimisation, (f) physical validation if plant data become accessible, and (g) a stable citable research snapshot/DOI with complete hourly archive and machine-readable environment lock file. These tasks remain **future work**, not completed analyses.
 
