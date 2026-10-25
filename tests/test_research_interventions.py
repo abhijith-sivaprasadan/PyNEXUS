@@ -138,6 +138,11 @@ def test_reference_and_wind_intervention_short_solve(tmp_path, registration, ori
         assert all(case["verification_b"].values())
         assert (tmp_path / case["scenario"] / "stage_a.csv").exists()
         assert (tmp_path / case["scenario"] / "stage_b.csv").exists()
+        dispatch = pd.read_csv(tmp_path / case["scenario"] / "stage_b.csv")
+        online = dispatch["online_status"].to_numpy(dtype=int)
+        power = dispatch["power_optimized_mw"].to_numpy(dtype=float)
+        assert set(online).issubset({0, 1})
+        assert np.all(online[power > 1e-3] == 1)
 
 
 def test_duplicate_output_path_never_overwrites(tmp_path):
