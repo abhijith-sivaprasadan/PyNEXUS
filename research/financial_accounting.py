@@ -219,8 +219,7 @@ def evaluate_matrix(summary, assumptions, *, acknowledge_synthetic):
         summary.get("status") != "COMPLETE_REGISTERED_MATRIX"
         or summary.get("hours") != 8760
         or summary.get("is_full_year") is not True
-        or summary.get("price_data_kind")
-        != "synthetic_daily_sinusoid_NOT_historical_market_data"
+        or summary.get("price_data_kind") != "synthetic_daily_sinusoid_NOT_historical_market_data"
     ):
         raise ValueError("Expected original full-year, complete, synthetic-price WP2 matrix")
     cases = summary.get("cases", [])
