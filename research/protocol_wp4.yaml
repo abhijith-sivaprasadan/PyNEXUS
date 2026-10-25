@@ -1,0 +1,37 @@
+# Pre-registered WP4 observational weather-year screening, separate from CDS-2023 baseline.
+schema_version: pynexus.wp4.weather.v1
+primary_question: Is the WP2 hydrogen shortfall and E+S storage interaction stable across weather years?
+weather_provider: open-meteo historical archive
+weather_model: era5
+weather_variable: wind_speed_100m
+weather_speed_unit: m/s
+cell_selection: nearest
+elevation_adjustment: disabled_with_elevation_nan
+provider_url: https://archive-api.open-meteo.com/v1/archive
+latitude: 52.5
+longitude: 3.5
+years: [2021, 2022, 2023, 2024, 2025]
+timestamp_timezone: UTC
+separate_data_source_from_original_cds_2023: true
+hub_height_conversion: data.era5.wind_speed_at_hub_height_from_100m
+wind_farm_model: components.wind_turbine.OffshoreWindFarm.power_output_mw_from_hub_height
+hours_per_year:
+  '2021': 8760
+  '2022': 8760
+  '2023': 8760
+  '2024': 8784
+  '2025': 8760
+registered_scenarios: [baseline, W, E, G, S, eta, E+S]
+case_definitions: research/protocol_wp2.yaml
+objective_a: minimize_unserved
+objective_b: minimize_cash_cost
+primary_endpoint: stage_a_unserved_hydrogen_fraction
+interaction_endpoint: conditional_extra_storage_gain_after_E_percentage_points
+analysis:
+  compare_2023_provider_with_cds_historical: true
+  report_shortfall_fraction_and_kg_separately_for_leap_year: true
+  do_not_use_stage_b_synthetic_prices_for_economic_conclusions: true
+  do_not_claim_five_years_are_independent_random_samples: true
+  no_silent_gap_filling_or_calendar_shifting: true
+  no_automatic_fallback_if_api_fails: true
+  keep_each_year_input_hash_and_full_hourly_dispatch: true
