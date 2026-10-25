@@ -72,9 +72,7 @@ def test_all_interventions_apply_without_mutating_source(registration, original)
     assert json.dumps(original, sort_keys=True) == snapshot
 
 
-def test_efficiency_update_is_consumed_by_dispatch_conversion(
-    registration, original, tmp_path
-):
+def test_efficiency_update_is_consumed_by_dispatch_conversion(registration, original, tmp_path):
     old, _ = config_for_case(original, registration, ())
     new, _ = config_for_case(original, registration, ("eta",))
     old_path, new_path = tmp_path / "old.yaml", tmp_path / "new.yaml"
@@ -94,11 +92,13 @@ def test_pairwise_formula_calculates_real_fractional_interaction():
         shortfall = base - sum(effects.get(a, 0) for a in active)
         if name == "W+E":
             shortfall -= 0.03
-        cases.append({
-            "scenario": name,
-            "status": "VERIFIED_TWO_STAGE_SOLVE",
-            "metrics": {"stage_a_shortfall_fraction": shortfall},
-        })
+        cases.append(
+            {
+                "scenario": name,
+                "status": "VERIFIED_TWO_STAGE_SOLVE",
+                "metrics": {"stage_a_shortfall_fraction": shortfall},
+            }
+        )
     report = analyse_contrasts(cases, order)
     we = next(x for x in report["pairwise_interactions"] if x["pair"] == "W+E")
     assert we["interaction_fraction"] == pytest.approx(0.03)
@@ -112,14 +112,14 @@ def test_bad_reference_value_fails_closed(registration, original):
         config_for_case(wrong, registration, ("G",))
 
 
-def test_reference_and_wind_intervention_short_solve(
-    tmp_path, registration, original
-):
-    source = pd.DataFrame({
-        "wind_available_mw": np.array([10.0, 100.0, 20.0, 100.0]),
-        "electricity_price": np.array([12.0, 18.0, 21.0, 6.0]),
-        "carbon_intensity": np.array([200.0] * 4),
-    })
+def test_reference_and_wind_intervention_short_solve(tmp_path, registration, original):
+    source = pd.DataFrame(
+        {
+            "wind_available_mw": np.array([10.0, 100.0, 20.0, 100.0]),
+            "electricity_price": np.array([12.0, 18.0, 21.0, 6.0]),
+            "carbon_intensity": np.array([200.0] * 4),
+        }
+    )
     baseline = evaluate_case(
         ("baseline", ()), original, source, registration, tmp_path / "baseline", time_limit=60
     )
