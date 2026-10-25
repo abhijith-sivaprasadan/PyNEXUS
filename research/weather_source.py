@@ -32,28 +32,32 @@ VALID_YEARS = (2021, 2022, 2023, 2024, 2025)
 def make_request_url(year, *, latitude=52.5, longitude=3.5):
     if year not in VALID_YEARS:
         raise ValueError("WP4 pre-registers only complete years 2021 through 2025")
-    query = urllib.parse.urlencode({
-        "latitude": latitude,
-        "longitude": longitude,
-        "start_date": f"{year}-01-01",
-        "end_date": f"{year}-12-31",
-        "hourly": "wind_speed_100m",
-        "wind_speed_unit": "ms",
-        "timezone": "GMT",
-        "models": "era5",
-    })
+    query = urllib.parse.urlencode(
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": f"{year}-01-01",
+            "end_date": f"{year}-12-31",
+            "hourly": "wind_speed_100m",
+            "wind_speed_unit": "ms",
+            "timezone": "GMT",
+            "models": "era5",
+        }
+    )
     return API_URL + "?" + query
 
 
 def fetch_weather(year, *, fetcher=None, retries=3):
     """Fetch actual API bytes. No interpolations or synthetic fallback."""
     url = make_request_url(year)
+
     def request():
         req = urllib.request.Request(
             url, headers={"User-Agent": "PyNEXUS-reproducible-research/0.1"}
         )
         with urllib.request.urlopen(req, timeout=150) as reply:
             return reply.read()
+
     fetcher = fetcher or request
     for i in range(retries):
         try:
@@ -81,8 +85,11 @@ def validate_weather_payload(raw, year):
     hourly = data.get("hourly", {})
     times = pd.DatetimeIndex(pd.to_datetime(hourly["time"], utc=True))
     expected = pd.date_range(
-        f"{year}-01-01", f"{year + 1}-01-01",
-        freq="h", inclusive="left", tz="UTC",
+        f"{year}-01-01",
+        f"{year + 1}-01-01",
+        freq="h",
+        inclusive="left",
+        tz="UTC",
     )
     if len(times) != len(expected) or times.has_duplicates or not times.equals(expected):
         raise ValueError(
@@ -98,21 +105,25 @@ def validate_weather_payload(raw, year):
         raise ValueError("Provider must identify returned spatial coordinates")
     if not (50.0 < float(data["latitude"]) < 55.0 and 1.0 < float(data["longitude"]) < 6.0):
         raise ValueError("Unexpected returned ERA5 location")
-    return times, values, {
-        "provider": DATASET,
-        "explicit_model": "era5",
-        "reported_latitude": float(data["latitude"]),
-        "reported_longitude": float(data["longitude"]),
-        "utc_calendar": True,
-        "leap_year": bool(len(times) == 8784),
-        "hour_count": len(times),
-        "raw_json_sha256": hashlib.sha256(raw).hexdigest(),
-        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "processing_note": (
-            "Open-Meteo ERA5 wind_speed_100m is a separately served product, "
-            "not the exact historical CDS u/v grid-cell extraction."
-        ),
-    }
+    return (
+        times,
+        values,
+        {
+            "provider": DATASET,
+            "explicit_model": "era5",
+            "reported_latitude": float(data["latitude"]),
+            "reported_longitude": float(data["longitude"]),
+            "utc_calendar": True,
+            "leap_year": bool(len(times) == 8784),
+            "hour_count": len(times),
+            "raw_json_sha256": hashlib.sha256(raw).hexdigest(),
+            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "processing_note": (
+                "Open-Meteo ERA5 wind_speed_100m is a separately served product, "
+                "not the exact historical CDS u/v grid-cell extraction."
+            ),
+        },
+    )
 
 
 def convert_weather_to_wind_2023_model(v100, config_path):
