@@ -43,7 +43,9 @@ def price_coverage_diagnostics(prices):
     unique = inside.unique().sort_values()
     missing = EXPECTED.difference(unique)
     unexpected = unique.difference(EXPECTED)
-    deltas = np.diff(inside.asi8) / (60 * 1_000_000_000)
+    # Pandas 2/3 may store datetime64 at different internal resolutions.
+    # Timedelta arithmetic is unit-aware, unlike dividing .asi8 by nanoseconds.
+    deltas = pd.Series(inside).diff().dropna().dt.total_seconds().to_numpy() / 60
     counts = pd.Series(deltas).value_counts().sort_index()
     within_year = prices.iloc[np.flatnonzero((utc >= START) & (utc < END))]
     numerical = pd.to_numeric(within_year, errors="coerce").to_numpy(dtype=float)
