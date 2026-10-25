@@ -17,7 +17,6 @@ import yaml
 from research.interventions import PROTOCOL as WP2_PROTOCOL
 from research.interventions import registered_cases
 from research.run_reference import ROOT, sha256
-from research.wp5_market import PRICE_COLUMN
 
 ENGINEERING_PROTOCOL = ROOT / "research" / "protocol_wp4_engineering.yaml"
 EXPECTED_PRICE_SHA = "2dfea4651fce314893201e7b08a4ae0ad24deef6b69ef85d81d9f54428f95bb2"
@@ -148,7 +147,7 @@ def verify_wp5(folder, scenario):
     settlement = float(
         (
             (stage_b["grid_import_mw"] - stage_b["grid_export_mw"])
-            * stage_b[PRICE_COLUMN]
+            * stage_b["electricity_price"]
         ).sum()
     )
     if not np.isclose(
