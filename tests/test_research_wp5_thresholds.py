@@ -1,4 +1,5 @@
 """WP5 no-invented-input threshold tests."""
+
 import copy
 
 import pytest
@@ -18,21 +19,23 @@ def matrix():
             shortage, grid_cost = 80.0, 15.0
         if name == "E+S":
             shortage, grid_cost = 60.0, 27.0
-        rows.append({
-            "scenario": name,
-            "active_interventions": list(active),
-            "status": "VERIFIED_TWO_STAGE_SOLVE",
-            "metrics": {
-                "demand_h2_kg": 1000.0,
-                "stage_a_shortfall_kg": shortage,
-                "stage_b_shortfall_kg": shortage,
-                "stage_b_grid_settlement_eur_synthetic_prices": grid_cost,
-                "storage_capacity_kg": storage,
-                "electrolyser_capacity_mw": electro,
-                "wind_nameplate_mw": 150.0,
-                "grid_capacity_mw": 50.0,
-            },
-        })
+        rows.append(
+            {
+                "scenario": name,
+                "active_interventions": list(active),
+                "status": "VERIFIED_TWO_STAGE_SOLVE",
+                "metrics": {
+                    "demand_h2_kg": 1000.0,
+                    "stage_a_shortfall_kg": shortage,
+                    "stage_b_shortfall_kg": shortage,
+                    "stage_b_grid_settlement_eur_synthetic_prices": grid_cost,
+                    "storage_capacity_kg": storage,
+                    "electrolyser_capacity_mw": electro,
+                    "wind_nameplate_mw": 150.0,
+                    "grid_capacity_mw": 50.0,
+                },
+            }
+        )
     return {
         "status": "COMPLETE_REGISTERED_MATRIX",
         "hours": 8760,
@@ -52,7 +55,9 @@ def test_thresholds_arithmetic_and_scope():
     assert result["not_an_lcoh_or_investment_recommendation"]
 
 
-@pytest.mark.parametrize("mutation", ["missing", "synthetic_flag", "not_verified", "not_beneficial", "asset_drift"])
+@pytest.mark.parametrize(
+    "mutation", ["missing", "synthetic_flag", "not_verified", "not_beneficial", "asset_drift"]
+)
 def test_fail_closed(mutation):
     record = copy.deepcopy(matrix())
     if mutation == "missing":
