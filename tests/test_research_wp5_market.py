@@ -13,9 +13,9 @@ from research.wp5_market import (
     TIME_COLUMN,
     fetch_official_snapshot,
     load_snapshot,
-    price_coverage_diagnostics,
     normalise_hourly_prices,
     parse_snapshot_csv,
+    price_coverage_diagnostics,
     write_snapshot,
 )
 
