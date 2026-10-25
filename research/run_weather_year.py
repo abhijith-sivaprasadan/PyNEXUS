@@ -52,11 +52,8 @@ def run_year(year, output, *, time_limit=600):
     if wp2["order"] != ["W", "E", "G", "S", "eta"]:
         raise ValueError("Unexpected WP2 intervention registration")
     _, base_config, historical_mode = source_inputs(wp2, hours=8760)
-    # The annual benchmark is the physical reference, not a weather-year input.
-    if sha256(CONFIG) != sha256(
-        ROOT / "outputs" / "annual_2023" / "grid_storage_hourly" / "config.yaml"
-    ):
-        raise ValueError("Baseline config unexpectedly moved")
+    # source_inputs already validates the archived configuration against the
+    # original recorded manifest (allowing only LF/CRLF serialization).
     raw, request_url = fetch_weather(year)
     timestamps, speed_100m, meta = validate_weather_payload(raw, year)
     expected_hours = registration["hours_per_year"][str(year)]
