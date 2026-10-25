@@ -3,6 +3,7 @@
 Inputs include ERA5-derived 2023 wind and synthetic price/carbon signals.
 This is a controlled computational experiment, not a market valuation.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -63,7 +64,9 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
 
     revision = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     manifest = {
         "schema_version": "pynexus.research.wp1.v1",
@@ -78,14 +81,13 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
             x: importlib.metadata.version(x) for x in ("pyomo", "highspy", "numpy", "pandas")
         },
         "solver": {
-            "name": "highs", "mip_rel_gap_limit": mip_rel_gap,
+            "name": "highs",
+            "mip_rel_gap_limit": mip_rel_gap,
             "time_limit_seconds": time_limit_seconds,
         },
         "result": {
             "total_demand_kg": report["total_demand_kg"],
-            "optimistic_shortfall_lower_bound_kg": report[
-                "optimistic_shortfall_lower_bound_kg"
-            ],
+            "optimistic_shortfall_lower_bound_kg": report["optimistic_shortfall_lower_bound_kg"],
             "stage_a_unserved_kg": report["stage_a_unserved_kg"],
             "stage_b_unserved_kg": report["stage_b_unserved_kg"],
             "numerical_allowance_kg": report["numerical_allowance_kg"],
@@ -94,15 +96,25 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
             "cashflow_objective": report["stage_b"]["objective_definition"],
         },
         "stage_a_solver": {
-            k: report["stage_a"][k] for k in (
-                "solver_status", "termination_condition", "solve_wall_time_s",
-                "variables", "binary_variables", "constraints",
+            k: report["stage_a"][k]
+            for k in (
+                "solver_status",
+                "termination_condition",
+                "solve_wall_time_s",
+                "variables",
+                "binary_variables",
+                "constraints",
             )
         },
         "stage_b_solver": {
-            k: report["stage_b"][k] for k in (
-                "solver_status", "termination_condition", "solve_wall_time_s",
-                "variables", "binary_variables", "constraints",
+            k: report["stage_b"][k]
+            for k in (
+                "solver_status",
+                "termination_condition",
+                "solve_wall_time_s",
+                "variables",
+                "binary_variables",
+                "constraints",
             )
         },
         "independent_verification": {
@@ -111,9 +123,7 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
         },
         "artifacts": {
             "dispatch_adequacy_sha256": sha256(output / "dispatch_adequacy.csv"),
-            "dispatch_grid_settlement_sha256": sha256(
-                output / "dispatch_grid_settlement.csv"
-            ),
+            "dispatch_grid_settlement_sha256": sha256(output / "dispatch_grid_settlement.csv"),
         },
         "limitations": [
             "The archived 2023 electricity prices are synthetic, not ENTSO-E.",
@@ -136,7 +146,8 @@ def main(argv=None):
     parser.add_argument("--mip-rel-gap", type=float, default=1e-4)
     args = parser.parse_args(argv)
     manifest = reference_run(
-        args.output, time_limit_seconds=args.time_limit_seconds,
+        args.output,
+        time_limit_seconds=args.time_limit_seconds,
         mip_rel_gap=args.mip_rel_gap,
     )
     print(json.dumps(manifest["result"], sort_keys=True, indent=2))
