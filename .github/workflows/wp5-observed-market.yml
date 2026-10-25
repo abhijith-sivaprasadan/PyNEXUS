@@ -58,7 +58,7 @@ jobs:
             exit 1
           fi
       - name: Run strict UTC/DST and credential-safe regression tests
-        run: python -m pytest -q tests/test_research_wp5_market.py tests/test_entsoe.py
+        run: python -m pytest -q tests/test_research_wp5_market.py tests/test_entsoe.py tests/test_entsoe_secret_safety.py
       - name: Fetch A44 price series for Netherlands and validate exact UTC coverage
         run: python -m research.wp5_market fetch --output wp5-nl-2023-market-prices
       - name: Verify saved 2023 evidence is loadable and hash consistent
