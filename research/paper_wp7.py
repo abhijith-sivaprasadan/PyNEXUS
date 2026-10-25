@@ -30,7 +30,25 @@ WP2_RUN = 40148299968
 WP3_RUN = 40150436630
 WP4_RUN = 40157038537
 WP6_RUN = 40190690775
-EXPECTED = ("baseline", "W", "E", "G", "S", "eta", "W+E", "W+G", "W+S", "W+eta", "E+G", "E+S", "E+eta", "G+S", "G+eta", "S+eta", "all")
+EXPECTED = (
+    "baseline",
+    "W",
+    "E",
+    "G",
+    "S",
+    "eta",
+    "W+E",
+    "W+G",
+    "W+S",
+    "W+eta",
+    "E+G",
+    "E+S",
+    "E+eta",
+    "G+S",
+    "G+eta",
+    "S+eta",
+    "all",
+)
 WEATHER_SCENARIOS = ("baseline", "W", "E", "G", "S", "eta", "E+S")
 YEARS = (2021, 2022, 2023, 2024, 2025)
 MODEL = "PyNEXUS|OpenMeteo-ERA5|Fixed-System-Adequacy"
@@ -47,7 +65,9 @@ def pinned_json(path, hash_value, label):
 
 
 def close(value, expected, label, *, atol=1e-3):
-    if not np.isfinite(float(value)) or not np.isclose(float(value), expected, rtol=1e-9, atol=atol):
+    if not np.isfinite(float(value)) or not np.isclose(
+        float(value), expected, rtol=1e-9, atol=atol
+    ):
         raise ValueError(f"{label}: independent numerical check failed")
 
 
@@ -87,8 +107,11 @@ def audit_wp2(root):
         b = pd.read_csv(
             folder / "stage_b.csv",
             usecols=[
-                "timestep", "demand_slack_kg_h", "electricity_price",
-                "grid_import_mw", "grid_export_mw",
+                "timestep",
+                "demand_slack_kg_h",
+                "electricity_price",
+                "grid_import_mw",
+                "grid_export_mw",
             ],
         )
         if len(a) != 8760 or len(b) != 8760:
@@ -111,7 +134,11 @@ def audit_wp2(root):
         close(demand, met["demand_h2_kg"], name + " demand")
         close(a_short, met["stage_a_shortfall_kg"], name + " Stage A")
         close(b_short, met["stage_b_shortfall_kg"], name + " Stage B")
-        close(settlement, met["stage_b_grid_settlement_eur_synthetic_prices"], name + " Stage B settlement")
+        close(
+            settlement,
+            met["stage_b_grid_settlement_eur_synthetic_prices"],
+            name + " Stage B settlement",
+        )
         close(a_short / demand, met["stage_a_shortfall_fraction"], name + " fraction", atol=1e-10)
         allowance = max(1e-4, 1e-8 * demand)
         if b_short + 1e-4 < a_short or b_short > a_short + allowance + 1e-4:
@@ -148,13 +175,20 @@ def audit_wp3(root, wp2_summary, wp2_df):
         close(d["annual_unserved_kg_stage_a"], row["unserved_h2_t"] * 1000, "WP3 cross-check")
         close(
             d["optimistic_unavoidable_shortfall_kg"] + d["unserved_above_optimistic_bound_kg"],
-            d["annual_unserved_kg_stage_a"], "optimistic bound decomposition",
+            d["annual_unserved_kg_stage_a"],
+            "optimistic bound decomposition",
         )
         if not d["stage_a_independent_verification"] or not d["stage_b_independent_verification"]:
             raise ValueError("WP3 missing numerical verification")
     base = diagnostics.set_index("scenario")
-    effect = float(base.loc["E", "annual_unserved_kg_stage_a"] - base.loc["E+S", "annual_unserved_kg_stage_a"])
-    close(effect, result["research_focus"]["storage_conditional_benefit_after_electrolyser_expansion_kg"], "WP3 E+S")
+    effect = float(
+        base.loc["E", "annual_unserved_kg_stage_a"] - base.loc["E+S", "annual_unserved_kg_stage_a"]
+    )
+    close(
+        effect,
+        result["research_focus"]["storage_conditional_benefit_after_electrolyser_expansion_kg"],
+        "WP3 E+S",
+    )
     return result, diagnostics
 
 
@@ -180,9 +214,22 @@ def audit_wp4(root):
         if not np.isfinite(group[["unserved_fraction", "unserved_h2_kg"]].to_numpy()).all():
             raise ValueError("WP4 nonfinite data")
         for row in group.to_dict("records"):
-            close(row["unserved_fraction"] * (50_000 * h / 24), row["unserved_h2_kg"], "WP4 H2 mass")
+            close(
+                row["unserved_fraction"] * (50_000 * h / 24), row["unserved_h2_kg"], "WP4 H2 mass"
+            )
         m = next(z for z in result["annual_metrics"] if z["year"] == year)
-        close(100 * (group.loc["E", "unserved_fraction"] + group.loc["S", "unserved_fraction"] - group.loc["baseline", "unserved_fraction"] - group.loc["E+S", "unserved_fraction"]), m["E_plus_S_interaction_pp"], "WP4 E+S interaction", atol=1e-7)
+        close(
+            100
+            * (
+                group.loc["E", "unserved_fraction"]
+                + group.loc["S", "unserved_fraction"]
+                - group.loc["baseline", "unserved_fraction"]
+                - group.loc["E+S", "unserved_fraction"]
+            ),
+            m["E_plus_S_interaction_pp"],
+            "WP4 E+S interaction",
+            atol=1e-7,
+        )
     return result, frame
 
 
@@ -218,7 +265,9 @@ def audit_wp6(root, wp4):
 def do_figures(output, wp2, wp3, wp4):
     figdir = output / "figures"
     figdir.mkdir()
-    plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "savefig.dpi": 170})
+    plt.rcParams.update(
+        {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "savefig.dpi": 170}
+    )
     files = []
 
     def save(name):
@@ -231,7 +280,12 @@ def do_figures(output, wp2, wp3, wp4):
 
     # Figure 1: all 17 original CDS-2023 scenarios, ordered by preregistration.
     fig, ax = plt.subplots(figsize=(10, 6))
-    palette = ["#374151" if s == "baseline" else ("#2563eb" if s == "G" else ("#15803d" if s == "E+S" else "#94a3b8")) for s in wp2["scenario"]]
+    palette = [
+        "#374151"
+        if s == "baseline"
+        else ("#2563eb" if s == "G" else ("#15803d" if s == "E+S" else "#94a3b8"))
+        for s in wp2["scenario"]
+    ]
     ax.barh(wp2["scenario"], wp2["unserved_percent"], color=palette)
     ax.invert_yaxis()
     ax.set_xlabel("Stage A unmet configured H₂ demand (%)")
@@ -245,12 +299,22 @@ def do_figures(output, wp2, wp3, wp4):
     # Figure 2: identify 2021–2025 weather effects, do not pool original 2023 CDS.
     fig, ax = plt.subplots(figsize=(9, 4.8))
     for scenario, color, marker in (
-        ("baseline", "#334155", "o"), ("W", "#ea580c", "s"),
-        ("E", "#2563eb", "^"), ("E+S", "#15803d", "D"),
-        ("eta", "#7c3aed", "v"), ("G", "#64748b", "x"),
+        ("baseline", "#334155", "o"),
+        ("W", "#ea580c", "s"),
+        ("E", "#2563eb", "^"),
+        ("E+S", "#15803d", "D"),
+        ("eta", "#7c3aed", "v"),
+        ("G", "#64748b", "x"),
     ):
         rows = wp4[wp4["scenario"] == scenario].sort_values("year")
-        ax.plot(rows["year"], rows["unserved_fraction"] * 100, label=scenario, marker=marker, lw=1.9, color=color)
+        ax.plot(
+            rows["year"],
+            rows["unserved_fraction"] * 100,
+            label=scenario,
+            marker=marker,
+            lw=1.9,
+            color=color,
+        )
     ax.set_xticks(YEARS)
     ax.set_xlabel("ERA5 weather year (fixed technology vintage)")
     ax.set_ylabel("Stage A unmet configured H₂ demand (%)")
@@ -267,7 +331,9 @@ def do_figures(output, wp2, wp3, wp4):
         interactions.append(gain)
     ax.plot(YEARS, interactions, "o-", color="#15803d", lw=2, label="Open-Meteo ERA5 (WP4)")
     original = wp3["research_focus"]["electrolyser_storage_interaction_percentage_points"]
-    ax.scatter([2023], [original], marker="X", s=105, color="#be123c", label="Original CDS 2023 (WP3)")
+    ax.scatter(
+        [2023], [original], marker="X", s=105, color="#be123c", label="Original CDS 2023 (WP3)"
+    )
     ax.set_xticks(YEARS)
     ax.set_xlabel("Weather year")
     ax.set_ylabel("E+S finite interaction (percentage points)")
@@ -306,7 +372,10 @@ def write_tables(out, wp2, wp3, wp4):
     result = pd.DataFrame(
         {
             "year": YEARS,
-            "reference_wind_cf_percent": baseline.loc[list(YEARS), "wind_capacity_factor"].to_numpy() * 100,
+            "reference_wind_cf_percent": baseline.loc[
+                list(YEARS), "wind_capacity_factor"
+            ].to_numpy()
+            * 100,
             "baseline_shortfall_percent": w.loc[list(YEARS), "baseline"].to_numpy() * 100,
             "E_shortfall_percent": w.loc[list(YEARS), "E"].to_numpy() * 100,
             "E_plus_S_shortfall_percent": w.loc[list(YEARS), "E+S"].to_numpy() * 100,
@@ -317,11 +386,18 @@ def write_tables(out, wp2, wp3, wp4):
     b = table_dir / "table2_weather_robustness.csv"
     result.to_csv(b, index=False, float_format="%.12g")
     files.append(b)
-    selected = pd.DataFrame(wp3["case_diagnostics"]).set_index("scenario").loc[["baseline", "E", "E+S", "G"]]
+    selected = (
+        pd.DataFrame(wp3["case_diagnostics"])
+        .set_index("scenario")
+        .loc[["baseline", "E", "E+S", "G"]]
+    )
     cols = [
-        "annual_unserved_kg_stage_a", "optimistic_unavoidable_shortfall_kg",
-        "unserved_above_optimistic_bound_kg", "shortfall_hours_stage_a",
-        "storage_max_level_kg_stage_a", "storage_at_capacity_hours_stage_a",
+        "annual_unserved_kg_stage_a",
+        "optimistic_unavoidable_shortfall_kg",
+        "unserved_above_optimistic_bound_kg",
+        "shortfall_hours_stage_a",
+        "storage_max_level_kg_stage_a",
+        "storage_at_capacity_hours_stage_a",
     ]
     c = table_dir / "table3_constraint_bounds.csv"
     selected[cols].to_csv(c, float_format="%.12g")
@@ -333,8 +409,24 @@ def make_values(wp2, wp3, wp4):
     row = wp2.set_index("scenario")
     year_table = wp4.pivot(index="year", columns="scenario", values="unserved_fraction")
     e = wp3["research_focus"]
-    interactions = [100 * (year_table.loc[y, "E"] + year_table.loc[y, "S"] - year_table.loc[y, "baseline"] - year_table.loc[y, "E+S"]) for y in YEARS]
-    extra = [50_000 * (8784 if y == 2024 else 8760) / 24 * (year_table.loc[y, "E"] - year_table.loc[y, "E+S"]) / 1000 for y in YEARS]
+    interactions = [
+        100
+        * (
+            year_table.loc[y, "E"]
+            + year_table.loc[y, "S"]
+            - year_table.loc[y, "baseline"]
+            - year_table.loc[y, "E+S"]
+        )
+        for y in YEARS
+    ]
+    extra = [
+        50_000
+        * (8784 if y == 2024 else 8760)
+        / 24
+        * (year_table.loc[y, "E"] - year_table.loc[y, "E+S"])
+        / 1000
+        for y in YEARS
+    ]
     vals = {
         "baseline_shortfall_t": f"{row.loc['baseline', 'unserved_h2_t']:,.2f}",
         "baseline_shortfall_pct": f"{row.loc['baseline', 'unserved_percent']:.3f}",
@@ -351,7 +443,7 @@ def make_values(wp2, wp3, wp4):
         "optimistic_bound_t": f"{(row.loc['baseline', 'unserved_h2_t'] * 1000 - e['baseline_shortfall_above_independent_energy_bound_kg']) / 1000:.2f}",
         "baseline_bound_share_pct": f"{e['baseline_unavoidable_fraction_of_observed_shortfall'] * 100:.4f}",
         "baseline_gap_above_bound_t": f"{e['baseline_shortfall_above_independent_energy_bound_kg'] / 1000:.2f}",
-        "baseline_max_storage_t": f"{float(next(z for z in wp3['case_diagnostics'] if z['scenario']=='baseline')['storage_max_level_kg_stage_a']) / 1000:.2f}",
+        "baseline_max_storage_t": f"{float(next(z for z in wp3['case_diagnostics'] if z['scenario'] == 'baseline')['storage_max_level_kg_stage_a']) / 1000:.2f}",
         "wp4_min_shortfall_pct": f"{year_table['baseline'].min() * 100:.3f}",
         "wp4_max_shortfall_pct": f"{year_table['baseline'].max() * 100:.3f}",
         "wp4_min_interaction_pp": f"{min(interactions):.3f}",
@@ -374,9 +466,9 @@ def make_values(wp2, wp3, wp4):
         "| Year | Reference wind CF (%) | Baseline shortfall (%) | E+S shortfall (%) | E+S interaction (pp) |\n"
         "|--:|--:|--:|--:|--:|\n"
         + "".join(
-            f"| {year} | {wp4[(wp4['year']==year) & (wp4['scenario']=='baseline')]['wind_capacity_factor'].iloc[0]*100:.2f} | "
-            f"{year_table.loc[year, 'baseline']*100:.3f} | "
-            f"{year_table.loc[year, 'E+S']*100:.3f} | "
+            f"| {year} | {wp4[(wp4['year'] == year) & (wp4['scenario'] == 'baseline')]['wind_capacity_factor'].iloc[0] * 100:.2f} | "
+            f"{year_table.loc[year, 'baseline'] * 100:.3f} | "
+            f"{year_table.loc[year, 'E+S'] * 100:.3f} | "
             f"{interaction:.3f} |\n"
             for year, interaction in zip(YEARS, interactions, strict=True)
         )
@@ -387,9 +479,9 @@ def make_values(wp2, wp3, wp4):
         "| Scenario | Optimistic unavoidable (t/y) | Above bound (t/y) | Storage maximum (t) |\n"
         "|:--|--:|--:|--:|\n"
         + "".join(
-            f"| {name} | {d.loc[name, 'optimistic_unavoidable_shortfall_kg']/1000:,.2f} | "
-            f"{d.loc[name, 'unserved_above_optimistic_bound_kg']/1000:,.2f} | "
-            f"{d.loc[name, 'storage_max_level_kg_stage_a']/1000:.2f} |\n"
+            f"| {name} | {d.loc[name, 'optimistic_unavoidable_shortfall_kg'] / 1000:,.2f} | "
+            f"{d.loc[name, 'unserved_above_optimistic_bound_kg'] / 1000:,.2f} | "
+            f"{d.loc[name, 'storage_max_level_kg_stage_a'] / 1000:.2f} |\n"
             for name in ("baseline", "E", "E+S", "G")
         )
     )
@@ -424,7 +516,21 @@ def build(wp2, wp3, wp4, wp6, template, output):
     paper = partial / "MANUSCRIPT.md"
     paper.write_text(render_markdown(template, values), encoding="utf-8")
     audit = partial / "claim_audit.json"
-    audit.write_text(json.dumps({"rendered_values": values, "source_sha256": SHA, "synthesis_source_revision": synthesis["source_revision"], "wp2_source_revision": summary["research_version"], "previous_wp6_pyam_version": metadata["pyam_version"]}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    audit.write_text(
+        json.dumps(
+            {
+                "rendered_values": values,
+                "source_sha256": SHA,
+                "synthesis_source_revision": synthesis["source_revision"],
+                "wp2_source_revision": summary["research_version"],
+                "previous_wp6_pyam_version": metadata["pyam_version"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     evidence = {
         "schema_version": "pynexus.wp7.manuscript.v1",
         "status": "GENERATED_FROM_BYTE_PINNED_VERIFIED_ARCHIVES",
@@ -436,7 +542,9 @@ def build(wp2, wp3, wp4, wp6, template, output):
         "not_a_new_external_physical_or_market_validation": True,
         "synthetic_electricity_prices_not_market_evidence": True,
         "source_sha256": SHA,
-        "file_sha256": {str(p.relative_to(partial)): digest(p) for p in [paper, audit, *figures, *tables]},
+        "file_sha256": {
+            str(p.relative_to(partial)): digest(p) for p in [paper, audit, *figures, *tables]
+        },
         "references_reviewed_separately_not_cited_as_evidence_of_model_outputs": True,
     }
     manifest = partial / "manifest.json"
@@ -451,7 +559,9 @@ def main(argv=None):
         parser.add_argument("--" + arg, type=Path, required=True)
     a = parser.parse_args(argv)
     record = build(a.wp2, a.wp3, a.wp4, a.wp6, a.template, a.output)
-    print("WP7 PASS: 17 hourly source pairs, 35 prior WP4 results, 250 IAMC cells; manuscript and 4 figures generated")
+    print(
+        "WP7 PASS: 17 hourly source pairs, 35 prior WP4 results, 250 IAMC cells; manuscript and 4 figures generated"
+    )
     print(json.dumps(record["source_sha256"], indent=2))
     return 0
 
