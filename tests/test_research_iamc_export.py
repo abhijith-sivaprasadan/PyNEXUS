@@ -107,8 +107,8 @@ def test_pyam_real_wide_csv_roundtrip(tmp_path):
 @pytest.mark.parametrize(
     ("mutator", "pattern"),
     [
-        (lambda x: x["annual_results"].pop(), "35"),
-        (lambda x: x["annual_results"][0].update({"year": 2020}), "scenario-year"),
+        (lambda x: x["annual_results"].pop(), "Missing annual"),
+        (lambda x: x["annual_results"][0].update({"year": 2020}), "Scenario-year"),
         (lambda x: x["annual_results"][0].update({"hours": 8784}), "Leap-year"),
         (lambda x: x["annual_results"][0].update({"unserved_h2_kg": 1}), "identity"),
         (lambda x: x["annual_results"][1].update({"benefit_percentage_points": 4.5}), "benefit"),
