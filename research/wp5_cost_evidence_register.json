@@ -1,0 +1,133 @@
+{
+  "schema_version": "pynexus.wp5.external_cost_evidence.v1",
+  "audit_date_utc": "2026-10-25",
+  "readiness": "PRIMARY_SOURCES_LOCATED_COST_FRONTIER_NOT_YET_SOURCE_COMPLETE",
+  "model": "Stylised Netherlands North Sea 150MW wind / 100-125MW PEM electrolyser / 20-40t aboveground hydrogen storage / 50-100MW grid",
+  "required_financial_basis": {
+    "currency": "EUR",
+    "real_price_year": 2023,
+    "scope": "annualised installed costs including balance-of-plant but avoiding grid/offshore-double-counting",
+    "unresolved": [
+      "asset vendor/engineering scope",
+      "geographic uplift and 2023 EUR conversion",
+      "grid connection CAPEX independent of wind installation CAPEX",
+      "electrolyser efficiency upgrade capital premium",
+      "fixed and variable OPEX",
+      "technology replacement/degradation and residual value",
+      "WACC applicable to Netherlands project",
+      "network tariffs, imbalance and trading contract",
+      "aboveground hydrogen storage operating pressure and compressor boundary"
+    ]
+  },
+  "reviewed_evidence": [
+    {
+      "asset": "PEM electrolyser",
+      "source": "IEA Global Hydrogen Review 2024, Chapter 3 p.77, Figure 3.9",
+      "url": "https://www.iea.org/reports/global-hydrogen-review-2024/hydrogen-production",
+      "published_year": 2024,
+      "reference_year": 2023,
+      "quoted_number": 2450,
+      "quoted_units": "USD per kW_el installed PEM",
+      "scope": "Equipment, gas treatment, balance of plant, EPC, installation and contingencies",
+      "research_applicability": "candidate benchmark; USD->2023 EUR via audited ECB series required",
+      "do_not_double_count": [
+        "electrolyser BoP if already included",
+        "gas treatment and installation if separately quoted"
+      ],
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    },
+    {
+      "asset": "Aboveground hydrogen storage",
+      "source": "EU Clean Hydrogen Partnership SRIA KPI, aboveground storage 2024 target",
+      "url": "https://www.clean-hydrogen.europa.eu/knowledge-management/strategy-map-and-key-performance-indicators/clean-hydrogen-ju-sria-key-performance-indicators-kpis_en",
+      "published_year": null,
+      "reference_year": 2024,
+      "quoted_number": 700,
+      "quoted_units": "EUR per kg hydrogen storage rated capacity",
+      "scope": "2024 KPI/target for aboveground 5 tonne aboveground hydrogen storage, system includes compression to 120 bar, purification; not a vendor cost for 20-40t at 30bar",
+      "research_applicability": "NON-COMPARABLE without engineering and 2024->2023 inflation adjustment; publish as separate sensitivity reference only",
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    },
+    {
+      "asset": "Offshore wind farm",
+      "source": "NREL 2024 Annual Technology Baseline offshore wind, 2022 engineering base-year cost modelling and geographically varying CAPEX/OPEX",
+      "url": "https://atb.nrel.gov/electricity/2024/offshore_wind",
+      "published_year": 2024,
+      "reference_year": 2022,
+      "quoted_number": null,
+      "quoted_units": "USD per kW and fixed O&M per MW-year depending on reference site",
+      "scope": "US marine conditions, installation, array/electrical portions depend on NREL wind class; must select appropriate region and double-counting boundary",
+      "research_applicability": "METHODS_SOURCE_ONLY; no defensible universal EUR/MW value selected",
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    },
+    {
+      "asset": "USD/EUR currency basis",
+      "source": "European Central Bank annual reference-rate series EXR.A.USD.EUR.SP00.A",
+      "url": "https://data.ecb.europa.eu/data/concepts/united-states-dollar",
+      "published_year": 2026,
+      "reference_year": 2023,
+      "quoted_number": 1.0813,
+      "quoted_units": "USD per 1 EUR, 2023 annual average; corroborate exact primary ECB 2023 observation before using",
+      "scope": "Annual average reference exchange rate, not project procurement hedge or FX quote",
+      "research_applicability": "Candidate FX denominator for historical USD-denominated 2023 data; primary observation must be captured into verified cost file",
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    },
+    {
+      "asset": "Inflation basis",
+      "source": "Eurostat annual HICP series prc_hicp_aind (discontinued; replaced by prc_hicp_ainr)",
+      "url": "https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_aind/default/table?lang=en",
+      "published_year": 2026,
+      "reference_year": 2023,
+      "quoted_number": null,
+      "quoted_units": "Annual average 2023/2024 index; use project-location-specific index when justified",
+      "scope": "Consumer inflation proxy; not capital equipment producer index",
+      "research_applicability": "DO NOT automatically deflate nominal equipment quote using generic HICP",
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    },
+    {
+      "asset": "Hydrogen storage compression and delivery",
+      "source": "US DOE Hydrogen Station Compression Storage and Dispensing Technical Status and Costs",
+      "url": "https://www.hydrogen.energy.gov/docs/hydrogenprogramlibraries/pdfs/58564.pdf",
+      "published_year": 2014,
+      "reference_year": null,
+      "quoted_number": null,
+      "quoted_units": "Hydrogen refuelling station costs per kg dispensed (not annual 20t buffer CAPEX)",
+      "scope": "Distribution compression, storage, refuelling/dispenser integration, different duty cycle and pressure",
+      "research_applicability": "CONTEXT_ONLY; forbidden to substitute refuelling LCOS for electrolysis buffer installed CAPEX",
+      "candidate_numeric_as_2023_eur": null,
+      "authorised_to_fill_full_model": false
+    }
+  ],
+  "coverage_by_required_model_coefficient": {
+    "wind.capex_eur_per_mw": "MISSING_APPLICABLE_2023_NL_INSTALLED_QUOTE",
+    "wind.fixed_opex_fraction": "MISSING_SOURCE_AND_SCOPE",
+    "wind.lifetime_years": "MISSING_SOURCE_AND_FINANCIAL_SCOPE",
+    "electrolyser.capex_eur_per_mw": "IEA_2023_USD_BENCHMARK_LOCATED_REQUIRES_FX_AND_SCOPE_REVIEW",
+    "electrolyser.fixed_opex_fraction": "MISSING_SOURCE_AND_SCOPE",
+    "electrolyser.lifetime_years": "MISSING_SOURCE_AND_SCOPE",
+    "grid_connection.capex_eur_per_mw": "MISSING_PROJECT_GRID_BOUNDARY",
+    "grid_connection.fixed_opex_fraction": "MISSING_SOURCE_AND_SCOPE",
+    "grid_connection.lifetime_years": "MISSING_SOURCE_AND_SCOPE",
+    "hydrogen_storage.capex_eur_per_kg": "EU_2024_TARGET_LOCATED_NOT_COMPARABLE_30BAR_2023",
+    "hydrogen_storage.fixed_opex_fraction": "MISSING_SOURCE_AND_SCOPE",
+    "hydrogen_storage.lifetime_years": "MISSING_SOURCE_AND_SCOPE",
+    "efficiency_upgrade.capex_eur_per_mw": "MISSING_VENDOR_TECHNOLOGY_AND_EFFICIENCY_PREMIUM",
+    "efficiency_upgrade.fixed_opex_fraction": "MISSING_SOURCE_AND_SCOPE",
+    "efficiency_upgrade.lifetime_years": "MISSING_SOURCE_AND_SCOPE",
+    "variable_opex_eur_per_kg_delivered": "MISSING_SOURCE_AND_SCOPE",
+    "discount_rate": "MISSING_PROJECT_WACC_AND_DISCLOSURE"
+  },
+  "forbidden_conclusions": [
+    "bankable LCOH",
+    "actual project cost",
+    "complete 17-case financial Pareto frontier",
+    "vendor-validated hydrogen storage pricing",
+    "2024 reference automatically treated as 2023 quoted euro price"
+  ],
+  "evaluation_action": "After 17-case A44 matrix exists, compare wholesale settlement vs physical adequacy immediately, but only compute and label annualised full-cost frontier when every required coefficient is sourced, normalized and independently reviewed."
+}
