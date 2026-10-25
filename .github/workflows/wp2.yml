@@ -1,0 +1,68 @@
+name: WP2 intervention study
+
+on:
+  pull_request:
+    branches:
+      - research/wp1-adequacy-first-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: WP2 protocol, regression and short-horizon preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q tests/test_research_adequacy.py tests/test_research_interventions.py
+      - name: Solve registered W+E scenario using 24 archived hours
+        run: python -m research.interventions --output wp2-smoke --hours 24 --scenario W+E --time-limit 180
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp2-short-horizon-preflight
+          path: wp2-smoke/
+          if-no-files-found: warn
+
+  annual-study:
+    name: WP2 registered 17-case 2023 annual study
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Solve all 17 full-year two-stage intervention cases
+        run: python -m research.interventions --output wp2-annual-results --hours 8760 --time-limit 600
+      - name: Archive complete, individually verified hourly results and contrast table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp2-2023-17-case-study
+          path: wp2-annual-results/
+          if-no-files-found: warn

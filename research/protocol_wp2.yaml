@@ -1,0 +1,49 @@
+# PyNEXUS WP2 registered screening protocol, not verified future-technology forecasts.
+schema_version: pynexus.wp2.v1
+title: Quantifying technology and infrastructure adequacy gaps
+reference_data: outputs/annual_2023/grid_storage_hourly/inputs.csv
+reference_config: outputs/annual_2023/grid_storage_hourly/config.yaml
+year: 2023
+full_horizon_hours: 8760
+step_hours: 1
+objective_a: minimize_unserved
+objective_b: minimize_cash_cost
+mip_rel_gap: 0.0001
+shortfall_allowance_fraction_of_demand: 0.00000001
+order: [W, E, G, S, eta]
+interventions:
+  W:
+    field: wind_turbine.n_turbines
+    reference: 10
+    target: 15
+    nominal_wind_capacity_mw_before: 150
+    nominal_wind_capacity_mw_after: 225
+    method: scale_existing_hourly_wind_availability_by_turbine_count
+  E:
+    field: electrolyzer.rated_power_mw
+    reference: 100.0
+    target: 125.0
+  G:
+    field: grid.connection_capacity_mw
+    reference: 50.0
+    target: 100.0
+  S:
+    field: hydrogen_storage.capacity_kg
+    reference: 20000
+    target: 40000
+    initial_and_terminal_inventory_held_fixed: true
+    charging_and_discharging_limits_held_fixed: true
+  eta:
+    field: electrolyzer.nominal_efficiency
+    reference: 0.70
+    target: 0.75
+    method: recompute_optimizer_linearized_kg_per_mwh
+analysis:
+  baseline_plus_individual_plus_pairs_plus_combined: 17
+  primary_metric: stage_a_unserved_hydrogen_fraction
+  pairwise_contrast: benefit_AB_minus_benefit_A_minus_benefit_B
+  no_claims:
+    - The scenarios are not real technology adoption forecasts.
+    - Synthetic electricity prices are not observed Dutch market prices.
+    - Wholesale grid settlement is not total system cost or LCOH.
+    - The analysis is not a multi-IAM or global climate-mitigation assessment.

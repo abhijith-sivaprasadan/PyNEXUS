@@ -653,7 +653,14 @@ class ElectrolyzerDispatchOptimizer:
 
         # Extract solution
         power_schedule = np.array([pyo.value(model.p[t]) for t in range(T)])
-        online_status = np.array([pyo.value(model.u[t]) for t in range(T)])
+        online_status_raw = np.array([pyo.value(model.u[t]) for t in range(T)])
+        # MIP tolerances permit near-integer binary values (e.g. 0.99999995).
+        # Casting directly to int truncates those to ZERO and corrupts the
+        # exported on/off state. Reject nonintegral results before rounding.
+        online_status_rounded = np.rint(online_status_raw)
+        if np.any(np.abs(online_status_raw - online_status_rounded) > 1e-5):
+            raise RuntimeError("Solver returned an online state outside integrality tolerance")
+        online_status = online_status_rounded.astype(int)
         slack_values = np.array([pyo.value(model.demand_slack[t]) for t in range(T)])
 
         h2_produced_kg_h = power_schedule * self.h2_coeff
@@ -680,7 +687,7 @@ class ElectrolyzerDispatchOptimizer:
                 "wind_available_mw": wind_power_mw,
                 "curtailment_mw": curtailment_mw,
                 "power_optimized_mw": power_schedule,
-                "online_status": online_status.astype(int),
+                "online_status": online_status,
                 "electricity_price": electricity_prices,
                 "h2_produced_kg_h": h2_produced_kg_h,
                 "h2_demand_kg_h": self.hourly_demand_kg,

@@ -91,7 +91,17 @@ def solve_adequacy_first(
         shortfall_cap_kg=cap,
     )
     if not verified_b["passed"]:
-        raise RuntimeError(f"Independent Stage B verification failed: {verified_b['checks']}")
+        frame = stage_b["results_df"]
+        p = frame["power_optimized_mw"].to_numpy(dtype=float)
+        u = frame["online_status"].to_numpy(dtype=float)
+        lower = float(np.min(p - optimiser.p_min * u))
+        upper = float(np.max(p - optimiser.p_max * u))
+        raise RuntimeError(
+            "Independent Stage B verification failed: "
+            f"{verified_b['checks']}; min(p-p_min*u)={lower:.12g} MW; "
+            f"max(p-p_max*u)={upper:.12g} MW; "
+            f"min(p)={np.min(p):.12g}; max(p)={np.max(p):.12g}"
+        )
 
     final_unserved = float(stage_b["results_df"]["demand_slack_kg_h"].sum() * optimiser.dt)
     if final_unserved > cap + 1e-5:
