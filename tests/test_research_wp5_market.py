@@ -8,7 +8,6 @@ import pytest
 from research.wp5_market import (
     END,
     EXPECTED,
-    PRICE_COLUMN,
     START,
     TIME_COLUMN,
     load_snapshot,
