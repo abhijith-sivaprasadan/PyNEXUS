@@ -16,7 +16,11 @@ from research.interventions import PROTOCOL as WP2_PROTOCOL
 from research.interventions import config_for_case, source_inputs
 from research.run_reference import ROOT, sha256
 from research.run_weather_year import CASES, PROTOCOL
-from research.weather_source import convert_weather_to_wind_2023_model, validate_weather_payload
+from research.weather_source import (
+    convert_weather_to_wind_2023_model,
+    make_request_url,
+    validate_weather_payload,
+)
 
 YEARS = (2021, 2022, 2023, 2024, 2025)
 
@@ -40,6 +44,8 @@ def summarize_year(archive, registration, wp2, base_config):
         ROOT / "outputs/annual_2023/grid_storage_hourly/config.yaml"
     ):
         raise ValueError(f"{year}: reference config changed")
+    if result["request_url"] != make_request_url(year):
+        raise ValueError(f"{year}: offshore ERA5 request parameters differ from registered source")
     raw = (archive / "source_weather_api.json").read_bytes()
     if sha256(archive / "source_weather_api.json") != result["raw_api_response_sha256"]:
         raise ValueError(f"{year}: raw provider response hash mismatch")
