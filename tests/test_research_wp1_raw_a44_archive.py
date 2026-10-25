@@ -66,13 +66,17 @@ def test_no_provider_url_or_secret_leak_on_exception(tmp_path):
     with pytest.raises(RuntimeError, match="private provider details suppressed") as exc:
         fetch_raw_year(tmp_path / "failure", client=LeakyClient())
     assert "SECRET_PRIVATE_VALUE" not in str(exc.value)
-    assert "SECRET_PRIVATE_VALUE" not in (
-        tmp_path / "failure" / "raw_manifest.json"
-    ).read_text()
+    assert "SECRET_PRIVATE_VALUE" not in (tmp_path / "failure" / "raw_manifest.json").read_text()
 
 
-@pytest.mark.parametrize("raw", ["not-xml", "<Acknowledgement_MarketDocument/>",
-                                "<!DOCTYPE boom><Publication_MarketDocument/>"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not-xml",
+        "<Acknowledgement_MarketDocument/>",
+        "<!DOCTYPE boom><Publication_MarketDocument/>",
+    ],
+)
 def test_reject_non_price_or_active_xml(raw):
     with pytest.raises(ValueError):
         xml_summary(raw)
