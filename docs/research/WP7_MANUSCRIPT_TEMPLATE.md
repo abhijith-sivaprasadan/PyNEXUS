@@ -1,4 +1,4 @@
-# When does hydrogen storage improve wind-to-hydrogen adequacy? An auditable factorial intervention and weather-year screening study
+# When does hydrogen storage improve wind-to-hydrogen adequacy? An auditable intervention-matrix and weather-year screening study
 
 **Research manuscript — computational screening; version 0.1, 25 October 2026. Not submitted or peer-reviewed.**
 
