@@ -8,11 +8,13 @@ from research.emissions_accounting import grid_import_emissions
 
 
 def dispatch(imports=(10.0, 0.0), exports=(0.0, 5.0)):
-    return pd.DataFrame({
-        "grid_import_mw": imports,
-        "grid_export_mw": exports,
-        "power_optimized_mw": [15.0, 20.0],
-    })
+    return pd.DataFrame(
+        {
+            "grid_import_mw": imports,
+            "grid_export_mw": exports,
+            "power_optimized_mw": [15.0, 20.0],
+        }
+    )
 
 
 def test_two_hour_grid_only_no_export_credit():
