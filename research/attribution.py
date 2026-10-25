@@ -465,7 +465,6 @@ def main(argv=None):
     (args.output / "analysis.json").write_text(
         json.dumps(analysis, sort_keys=True, indent=2, allow_nan=False) + "\n",
         encoding="utf-8",
-
     )
     pd.DataFrame(analysis["case_diagnostics"]).to_csv(args.output / "diagnostics.csv", index=False)
     pd.DataFrame(analysis["monthly_diagnostics"]).to_csv(args.output / "monthly.csv", index=False)
