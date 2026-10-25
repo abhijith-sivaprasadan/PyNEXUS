@@ -1,0 +1,100 @@
+name: WP4 interannual ERA5 weather robustness
+
+on:
+  pull_request:
+    branches:
+      - research/wp3-constraint-attribution
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wp4-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q tests/test_research_weather.py tests/test_research_adequacy.py tests/test_research_interventions.py
+
+  weather-years:
+    name: Verified ERA5 weather year ${{ matrix.year }}
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        year: [2021, 2022, 2023, 2024, 2025]
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Retrieve actual ERA5-provider weather, validate calendar and run seven annual scenarios
+        run: |
+          python -m research.run_weather_year \
+            --year ${{ matrix.year }} \
+            --output wp4-year-${{ matrix.year }} \
+            --time-limit 600
+      - name: Preserve actual provider bytes, hashes, config, hourly dispatch and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp4-year-${{ matrix.year }}
+          path: wp4-year-${{ matrix.year }}/
+          if-no-files-found: warn
+          retention-days: 60
+
+  interannual-synthesis:
+    name: Independently verify all five years and publish comparison
+    needs: weather-years
+    if: ${{ needs.weather-years.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Download separately versioned weather-year artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wp4-year-*
+          path: wp4-year-inputs
+          merge-multiple: false
+      - name: Verify all 35 dispatches and calculate interannual physical rankings
+        run: python -m research.aggregate_weather --root wp4-year-inputs --output wp4-synthesis
+      - name: Archive verified five-year scientific synthesis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp4-2021-2025-interannual-synthesis
+          path: wp4-synthesis/
+          if-no-files-found: warn
+          retention-days: 60
