@@ -53,7 +53,9 @@ def run_year(year, output, *, time_limit=600):
         raise ValueError("Unexpected WP2 intervention registration")
     _, base_config, historical_mode = source_inputs(wp2, hours=8760)
     # The annual benchmark is the physical reference, not a weather-year input.
-    if sha256(CONFIG) != sha256(ROOT / "outputs" / "annual_2023" / "grid_storage_hourly" / "config.yaml"):
+    if sha256(CONFIG) != sha256(
+        ROOT / "outputs" / "annual_2023" / "grid_storage_hourly" / "config.yaml"
+    ):
         raise ValueError("Baseline config unexpectedly moved")
     raw, request_url = fetch_weather(year)
     timestamps, speed_100m, meta = validate_weather_payload(raw, year)
@@ -61,25 +63,34 @@ def run_year(year, output, *, time_limit=600):
     if len(timestamps) != expected_hours:
         raise ValueError("Registered year hour count mismatch")
     if (base_config["location"]["latitude"], base_config["location"]["longitude"]) != (
-        registration["latitude"], registration["longitude"]
+        registration["latitude"],
+        registration["longitude"],
     ):
         raise ValueError("Site coordinates changed")
     wind_mw = convert_weather_to_wind_2023_model(speed_100m, CONFIG)
     original = pd.read_csv(INPUTS)
-    prices = frozen_synthetic_signal(original["electricity_price"].to_numpy(dtype=float), len(wind_mw))
-    carbon = frozen_synthetic_signal(original["carbon_intensity"].to_numpy(dtype=float), len(wind_mw))
-    frame = pd.DataFrame({
-        "wind_available_mw": wind_mw,
-        "electricity_price": prices,
-        "carbon_intensity": carbon,
-    })
+    prices = frozen_synthetic_signal(
+        original["electricity_price"].to_numpy(dtype=float), len(wind_mw)
+    )
+    carbon = frozen_synthetic_signal(
+        original["carbon_intensity"].to_numpy(dtype=float), len(wind_mw)
+    )
+    frame = pd.DataFrame(
+        {
+            "wind_available_mw": wind_mw,
+            "electricity_price": prices,
+            "carbon_intensity": carbon,
+        }
+    )
     # Use the same equipment and demand parameters, and align the calendar metadata.
     base_config["simulation"]["start_date"] = f"{year}-01-01"
-    frame_dates = pd.DataFrame({
-        "datetime_utc": timestamps.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "wind_speed_100m_ms": speed_100m,
-        **{name: frame[name].to_numpy() for name in frame},
-    })
+    frame_dates = pd.DataFrame(
+        {
+            "datetime_utc": timestamps.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "wind_speed_100m_ms": speed_100m,
+            **{name: frame[name].to_numpy() for name in frame},
+        }
+    )
     output.mkdir(parents=True, exist_ok=False)
     (output / "source_weather_api.json").write_bytes(raw)
     frame_dates.to_csv(output / "hourly_weather_and_inputs.csv", index=False)
@@ -112,8 +123,10 @@ def run_year(year, output, *, time_limit=600):
         "wp2_protocol_sha256": sha256(WP2_PROTOCOL),
         "base_config_sha256": sha256(CONFIG),
         "code_revision": subprocess.run(
-            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True,
-            text=True, check=False,
+            ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout.strip(),
         "synthetic_price_note": (
             "Archived 2023 SYNTHETIC prices and carbon factors repeated modulo "
@@ -124,8 +137,10 @@ def run_year(year, output, *, time_limit=600):
         "annual_weather_available_mwh": float(wind_mw.sum()),
         "annual_nameplate_capacity_factor": float(
             wind_mw.mean()
-            / (base_config["wind_turbine"]["rated_power_mw"]
-               * base_config["wind_turbine"]["n_turbines"])
+            / (
+                base_config["wind_turbine"]["rated_power_mw"]
+                * base_config["wind_turbine"]["n_turbines"]
+            )
         ),
         "cases": [],
     }
@@ -133,7 +148,11 @@ def run_year(year, output, *, time_limit=600):
     for name, active in CASES.items():
         try:
             record = evaluate_case(
-                (name, active), base_config, frame, wp2, output / name,
+                (name, active),
+                base_config,
+                frame,
+                wp2,
+                output / name,
                 time_limit=time_limit,
             )
             manifest["cases"].append(record)
@@ -143,12 +162,14 @@ def run_year(year, output, *, time_limit=600):
                 flush=True,
             )
         except Exception as exc:
-            manifest["cases"].append({
-                "scenario": name,
-                "status": "ERROR_NOT_A_RESULT",
-                "error_type": type(exc).__name__,
-                "error": str(exc),
-            })
+            manifest["cases"].append(
+                {
+                    "scenario": name,
+                    "status": "ERROR_NOT_A_RESULT",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+            )
             manifest_path.write_text(
                 json.dumps(manifest, sort_keys=True, indent=2, allow_nan=False) + "\n",
                 encoding="utf-8",
@@ -162,9 +183,7 @@ def run_year(year, output, *, time_limit=600):
         r["scenario"]: r["metrics"]["stage_a_shortfall_fraction"] for r in manifest["cases"]
     }
     storage_after_e = fractions["E"] - fractions["E+S"]
-    interaction = (
-        fractions["E"] + fractions["S"] - fractions["baseline"] - fractions["E+S"]
-    )
+    interaction = fractions["E"] + fractions["S"] - fractions["baseline"] - fractions["E+S"]
     manifest["storage_conditional_gain_pp"] = 100 * storage_after_e
     manifest["electrolyser_storage_interaction_pp"] = 100 * interaction
     manifest["status"] = "COMPLETE_SEVEN_CASES_YEAR"
