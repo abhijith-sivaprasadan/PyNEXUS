@@ -67,34 +67,44 @@ def observed_case(path, scenario):
                 frame["timestep"].to_numpy(dtype=int), np.arange(8760)
             ):
                 raise ValueError("Incomplete or misordered 2023 hourly dispatch")
-            required = ("demand_slack_kg_h", "grid_import_mw", "grid_export_mw", "electricity_price")
+            required = (
+                "demand_slack_kg_h",
+                "grid_import_mw",
+                "grid_export_mw",
+                "electricity_price",
+            )
             for field in required:
                 vals = frame[field].to_numpy(dtype=float)
                 if not np.isfinite(vals).all():
                     raise ValueError("Nonfinite hourly dispatch")
-            if np.any(
-                np.minimum(frame["grid_import_mw"], frame["grid_export_mw"]) > 1e-6
-            ):
+            if np.any(np.minimum(frame["grid_import_mw"], frame["grid_export_mw"]) > 1e-6):
                 raise ValueError("Simultaneous grid import/export")
             tables[stage] = frame
         metrics = record["metrics"]
         if not np.isclose(
             tables["a"]["demand_slack_kg_h"].sum(),
-            metrics["stage_a_shortfall_kg"], atol=1e-3, rtol=0
+            metrics["stage_a_shortfall_kg"],
+            atol=1e-3,
+            rtol=0,
         ) or not np.isclose(
             tables["b"]["demand_slack_kg_h"].sum(),
-            metrics["stage_b_shortfall_kg"], atol=1e-3, rtol=0
+            metrics["stage_b_shortfall_kg"],
+            atol=1e-3,
+            rtol=0,
         ):
             raise ValueError("Hourly hydrogen shortfall does not match recorded KPI")
         stage_b = tables["b"]
-        settlement = float((
-            (stage_b["grid_import_mw"] - stage_b["grid_export_mw"])
-            * stage_b["electricity_price"]
-        ).sum())
+        settlement = float(
+            (
+                (stage_b["grid_import_mw"] - stage_b["grid_export_mw"])
+                * stage_b["electricity_price"]
+            ).sum()
+        )
         if not np.isclose(
             settlement,
             metrics["stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT"],
-            atol=0.01, rtol=0
+            atol=0.01,
+            rtol=0,
         ):
             raise ValueError("Hourly grid settlement does not match recorded KPI")
         return {
@@ -161,20 +171,26 @@ def validate_storage_costs(costs):
         raise ValueError("Invalid storage-cost assumptions schema")
     if costs.get("currency") != "EUR" or costs.get("price_year") != 2023:
         raise ValueError("Costs must be explicitly converted to 2023 EUR")
-    for key in ("capex_eur_per_kg", "fixed_opex_fraction", "lifetime_years", "discount_rate", "variable_opex_eur_per_additional_kg"):
+    for key in (
+        "capex_eur_per_kg",
+        "fixed_opex_fraction",
+        "lifetime_years",
+        "discount_rate",
+        "variable_opex_eur_per_additional_kg",
+    ):
         number(costs.get(key), key, positive=key == "lifetime_years")
     if number(costs["fixed_opex_fraction"], "fixed OPEX") > 1:
         raise ValueError("Invalid annual fixed OPEX fraction")
     sources = costs.get("source_register")
     if not isinstance(sources, dict) or any(
-        not isinstance(sources.get(k), str)
-        or not sources[k].startswith("https://")
+        not isinstance(sources.get(k), str) or not sources[k].startswith("https://")
         for k in ("capex", "opex", "asset_lifetime", "discount_rate", "variable_opex")
     ):
         raise ValueError("All cost fields require directly identifiable https source links")
-    if not isinstance(costs.get("engineering_scope_and_2023_normalisation"), str) or len(
-        costs["engineering_scope_and_2023_normalisation"]
-    ) < 50:
+    if (
+        not isinstance(costs.get("engineering_scope_and_2023_normalisation"), str)
+        or len(costs["engineering_scope_and_2023_normalisation"]) < 50
+    ):
         raise ValueError("Declare asset scope, inflation/FX normalisation and exclusions")
     return costs
 
@@ -190,7 +206,9 @@ def priced_increment(result, costs):
     annual_variable = extra_delivery * float(costs["variable_opex_eur_per_additional_kg"])
     total = (
         result["additional_net_wholesale_grid_settlement_eur"]
-        + annual_capex + annual_fixed + annual_variable
+        + annual_capex
+        + annual_fixed
+        + annual_variable
     )
     return {
         **result,
