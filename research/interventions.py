@@ -77,11 +77,9 @@ def config_for_case(base_config, protocol, active):
     return cfg, wind_scale
 
 
-def _historical_input_mode():
-    """Prove input byte identity or a CRLF/LF-only serialization change."""
-    historical = json.loads(HISTORICAL.read_text(encoding="utf-8"))
-    expected = historical["input_sha256"]
-    raw = INPUTS.read_bytes()
+def _verified_archived_bytes(path, expected):
+    """Prove byte identity or a CRLF/LF-only serialization change."""
+    raw = path.read_bytes()
     actual = hashlib.sha256(raw).hexdigest()
     lf = raw.replace(b"\r\n", b"\n")
     crlf = lf.replace(b"\n", b"\r\n")
@@ -100,9 +98,9 @@ def _historical_input_mode():
 
 
 def source_inputs(protocol, *, hours):
-    if sha256(CONFIG) != json.loads(HISTORICAL.read_text())["config_sha256"]:
-        raise RuntimeError("Archived annual configuration hash mismatch")
-    provenance = _historical_input_mode()
+    historical = json.loads(HISTORICAL.read_text(encoding="utf-8"))
+    provenance = _verified_archived_bytes(INPUTS, historical["input_sha256"])
+    _verified_archived_bytes(CONFIG, historical["config_sha256"])
     frame = pd.read_csv(INPUTS)
     cols = ("wind_available_mw", "electricity_price", "carbon_intensity")
     if len(frame) != protocol["full_horizon_hours"] or not set(cols).issubset(frame.columns):
