@@ -7,7 +7,6 @@ import pytest
 
 from research.wp1_raw_a44_archive import fetch_raw_year, months, xml_summary
 
-
 XML = """<?xml version="1.0" encoding="utf-8"?>
 <Publication_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3">
   <type>A44</type>
