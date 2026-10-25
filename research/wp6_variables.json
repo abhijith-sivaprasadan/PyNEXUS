@@ -1,0 +1,47 @@
+{
+  "schema_version": "pynexus.wp6.variables.v1",
+  "registry_status": "LOCAL_PYNEXUS_DICTIONARY_NOT_OFFICIAL_IAMC",
+  "naming": "Names are prefixed with PyNEXUS and must not be treated as official IAMC variable identifiers",
+  "variables": {
+    "hydrogen_demand": {
+      "variable": "PyNEXUS|Hydrogen|Demand",
+      "unit": "kg H2/yr",
+      "description": "Configured annual hydrogen demand = 50,000 kg/day multiplied by complete calendar days. Same demand for every registered scenario."
+    },
+    "unserved_hydrogen_stage_a": {
+      "variable": "PyNEXUS|Hydrogen|Unserved Demand|Stage A",
+      "unit": "kg H2/yr",
+      "description": "Annual unmet hydrogen in physical adequacy-minimising Stage A. From previously independently verified WP4 synthesis."
+    },
+    "unserved_fraction_stage_a": {
+      "variable": "PyNEXUS|Hydrogen|Unserved Demand|Stage A|Share",
+      "unit": "1",
+      "description": "Stage A annual unmet hydrogen divided by annual configured demand; a dimensionless fraction, not percent."
+    },
+    "delivered_hydrogen_stage_a": {
+      "variable": "PyNEXUS|Hydrogen|Delivered Demand|Stage A",
+      "unit": "kg H2/yr",
+      "description": "Configured demand less annual Stage A unserved hydrogen, not measured plant output or Stage B production."
+    },
+    "reference_wind_resource": {
+      "variable": "PyNEXUS|Wind|Reference Available Resource",
+      "unit": "MWh/yr",
+      "description": "Annual 150-MW REFERENCE wind-availability potential from WP4 weather before intervention scaling. Repeated in each scenario to preserve the source-series definition; NOT the available wind after W nameplate upgrade."
+    },
+    "reference_wind_capacity_factor": {
+      "variable": "PyNEXUS|Wind|Reference Capacity Factor",
+      "unit": "1",
+      "description": "Annual mean wind output divided by 150-MW REFERENCE installed wind nameplate. Common per weather year; does not represent W scenario upgraded capacity factor."
+    },
+    "adequacy_benefit_vs_baseline": {
+      "variable": "PyNEXUS|Hydrogen|Avoided Shortfall vs Baseline",
+      "unit": "percentage point",
+      "description": "Within the same weather year: 100 * (baseline Stage A unmet-demand fraction minus this scenario's Stage A unmet-demand fraction). Finite model contrast, not observed intervention impact."
+    },
+    "electrolyser_storage_interaction": {
+      "variable": "PyNEXUS|Hydrogen|Electrolyser Storage Interaction",
+      "unit": "percentage point",
+      "description": "Only for E+S: 100 * (E share + S share - baseline share - E+S share). Controlled model interaction; not a causal engineering estimate."
+    }
+  }
+}
