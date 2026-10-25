@@ -1,3 +1,5 @@
+> **Resolved primary-source A03 finding (2026-10-25):** The originally reported missing `2023-12-30 08:00 UTC` price was not missing market information. The original A44 XML has `curveType=A03` and intentionally omits unchanged-price position 10; ENTSO-E's official constant-block rule assigns the preceding €73.50/MWh price through that position. Original 14 monthly XML documents have been independently expanded and match the accepted processed 8,760-hour 2023 series exactly. [Full source-equality audit](WP1_2023_A03_PRIMARY_SOURCE_EQUIVALENCE.md). **Do not describe this hour as an unresolved provider outage or as interpolation.**
+
 # WP5B — private ENTSO-E token, reproducible Netherlands A44 2023 runbook
 
 **State:** secure *execution workflow* is available; the presence of this file
