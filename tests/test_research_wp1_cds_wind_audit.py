@@ -6,8 +6,8 @@ import pytest
 
 from components.wind_turbine import OffshoreWindFarm
 from data.era5 import wind_speed_at_hub_height_from_100m
-from research.wp1_cds_wind_audit import audit_cds_year, compare_utc_hourly_wind
 from research.run_reference import CONFIG
+from research.wp1_cds_wind_audit import audit_cds_year, compare_utc_hourly_wind
 
 
 def test_utc_hour_alignment_and_double_shear_avoidance():
