@@ -26,7 +26,7 @@ from research.interventions import (
     source_inputs,
 )
 from research.physical_bounds import optimistic_shortfall_lower_bound_kg
-from research.run_reference import INPUTS, ROOT, sha256
+from research.run_reference import INPUTS, sha256
 
 TOL_MW = 1e-3
 TOL_H2_KG = 1e-3
