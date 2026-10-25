@@ -292,8 +292,14 @@ class ElectrolyzerDispatchOptimizer:
         if objective == "minimize_cash_cost":
             if not enable_grid:
                 raise ValueError("Grid-settlement cost requires enable_grid=True")
-            if shortfall_cap_kg is None or not np.isfinite(shortfall_cap_kg) or shortfall_cap_kg < 0:
-                raise ValueError("minimize_cash_cost requires a finite nonnegative shortfall_cap_kg")
+            if (
+                shortfall_cap_kg is None
+                or not np.isfinite(shortfall_cap_kg)
+                or shortfall_cap_kg < 0
+            ):
+                raise ValueError(
+                    "minimize_cash_cost requires a finite nonnegative shortfall_cap_kg"
+                )
         elif shortfall_cap_kg is not None:
             raise ValueError("shortfall_cap_kg only applies to minimize_cash_cost")
         if objective == "minimize_emissions" and carbon_intensity is None:
@@ -521,8 +527,7 @@ class ElectrolyzerDispatchOptimizer:
         # adequacy optimum while choosing the least-cost grid settlement.
         if objective == "minimize_cash_cost":
             model.c_shortfall_cap = pyo.Constraint(
-                expr=sum(model.demand_slack[t] * self.dt for t in model.T)
-                <= shortfall_cap_kg
+                expr=sum(model.demand_slack[t] * self.dt for t in model.T) <= shortfall_cap_kg
             )
 
         # Keep historical objectives byte-for-byte unchanged; new research
@@ -539,8 +544,7 @@ class ElectrolyzerDispatchOptimizer:
             # Onsite wind CAPEX/OPEX and opportunity cost are out of scope.
             model.objective = pyo.Objective(
                 expr=sum(
-                    model.price[t] * (model.g_imp[t] - model.g_exp[t]) * self.dt
-                    for t in model.T
+                    model.price[t] * (model.g_imp[t] - model.g_exp[t]) * self.dt for t in model.T
                 ),
                 sense=pyo.minimize,
             )
