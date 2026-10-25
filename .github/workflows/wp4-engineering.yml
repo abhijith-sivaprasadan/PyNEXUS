@@ -1,0 +1,73 @@
+name: WP4 registered engineering sensitivity
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Registered one-factor engineering perturbation
+        type: choice
+        required: true
+        default: baseline
+        options:
+          - baseline
+          - low_min_load
+          - high_min_load
+          - slow_ramp
+          - fast_ramp
+          - slow_storage_charge
+          - fast_storage_charge
+          - slow_storage_discharge
+          - fast_storage_discharge
+          - low_storage_loss
+          - high_storage_loss
+          - lower_pipeline_limit
+          - higher_pipeline_limit
+          - lower_daily_demand
+          - higher_daily_demand
+          - wind_available_90pct
+          - wind_available_110pct
+      mode:
+        description: 24h smoke or genuine full-year 8760h verification
+        type: choice
+        required: true
+        default: smoke-24h
+        options:
+          - smoke-24h
+          - annual-8760
+permissions:
+  contents: read
+concurrency:
+  group: wp4-engineering-${{ github.ref }}-${{ inputs.scenario }}
+  cancel-in-progress: false
+jobs:
+  study:
+    name: WP4 engineering one-factor diagnostic
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Check mathematical implementation on frozen short source
+        run: python -m pytest -q tests/test_research_engineering_sensitivity.py
+      - name: Solve registered scenario and archive source-locked result
+        run: |
+          if [ "${{ inputs.mode }}" = "annual-8760" ]; then hours=8760; else hours=24; fi
+          python -m research.engineering_sensitivity \
+            --case "${{ inputs.scenario }}" \
+            --hours "$hours" \
+            --time-limit 1200 \
+            --output "wp4-engineering-${{ inputs.scenario }}-$hours"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp4-engineering-${{ inputs.scenario }}-${{ inputs.mode }}
+          path: wp4-engineering-*/
+          retention-days: 60
+          if-no-files-found: warn

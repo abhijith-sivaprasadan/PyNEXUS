@@ -1,0 +1,26 @@
+schema_version: pynexus.wp4.engineering.v1
+reference_case: baseline
+source: archived_CDS_2023_ERA5_and_original_synthetic_price
+horizon_hours: 8760
+intervention_protocol: research/protocol_wp2.yaml
+grid_exchange_mode: legacy
+# The listed values are controlled mathematical screening cases, NOT sourced
+# engineering confidence intervals. Their sensitivity cannot establish real-world probabilities.
+registered_cases:
+  baseline: {path: null, value: null}
+  low_min_load: {path: electrolyzer.min_load_fraction, value: 0.05}
+  high_min_load: {path: electrolyzer.min_load_fraction, value: 0.20}
+  slow_ramp: {path: electrolyzer.ramp_rate_per_hour, value: 0.20}
+  fast_ramp: {path: electrolyzer.ramp_rate_per_hour, value: 0.80}
+  slow_storage_charge: {path: hydrogen_storage.max_charge_rate_kg_h, value: 1100}
+  fast_storage_charge: {path: hydrogen_storage.max_charge_rate_kg_h, value: 3300}
+  slow_storage_discharge: {path: hydrogen_storage.max_discharge_rate_kg_h, value: 1100}
+  fast_storage_discharge: {path: hydrogen_storage.max_discharge_rate_kg_h, value: 3300}
+  low_storage_loss: {path: hydrogen_storage.loss_fraction_per_hour, value: 0.00005}
+  high_storage_loss: {path: hydrogen_storage.loss_fraction_per_hour, value: 0.00020}
+  lower_pipeline_limit: {path: pipeline.max_flow_kg_per_s, value: 0.7}
+  higher_pipeline_limit: {path: pipeline.max_flow_kg_per_s, value: 3.0}
+  lower_daily_demand: {path: hydrogen_demand.daily_average_kg, value: 45000}
+  higher_daily_demand: {path: hydrogen_demand.daily_average_kg, value: 55000}
+  wind_available_90pct: {path: wind_availability_multiplier, value: 0.90}
+  wind_available_110pct: {path: wind_availability_multiplier, value: 1.10}
