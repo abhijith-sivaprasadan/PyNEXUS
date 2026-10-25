@@ -42,6 +42,8 @@ def make_request_url(year, *, latitude=52.5, longitude=3.5):
             "wind_speed_unit": "ms",
             "timezone": "GMT",
             "models": "era5",
+            "cell_selection": "nearest",
+            "elevation": "nan",
         }
     )
     return API_URL + "?" + query
@@ -119,7 +121,9 @@ def validate_weather_payload(raw, year):
             "raw_json_sha256": hashlib.sha256(raw).hexdigest(),
             "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
             "processing_note": (
-                "Open-Meteo ERA5 wind_speed_100m is a separately served product, "
+                "Open-Meteo ERA5 uses explicit nearest-cell selection and " 
+                "elevation=nan to avoid default land-biased cell choice; " 
+                "this wind_speed_100m is a separately served product, "
                 "not the exact historical CDS u/v grid-cell extraction."
             ),
         },
