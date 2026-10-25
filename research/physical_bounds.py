@@ -1,12 +1,11 @@
 """Optimistic, independent energy-capacity bounds for adequacy experiments."""
+
 from __future__ import annotations
 
 import numpy as np
 
 
-def optimistic_shortfall_lower_bound_kg(
-    optimiser, wind_power_mw, *, grid_enabled, storage_enabled
-):
+def optimistic_shortfall_lower_bound_kg(optimiser, wind_power_mw, *, grid_enabled, storage_enabled):
     """Lower bound on unavoidable H2 shortfall, without solving a MILP.
 
     The bound ignores ramping and electrolyser minimum-load rules, making
@@ -25,7 +24,8 @@ def optimistic_shortfall_lower_bound_kg(
     optimistic_production = float(optimistic_power.sum() * optimiser.h2_coeff * optimiser.dt)
     initial_inventory_credit = (
         max(0.0, optimiser.storage_initial_kg - optimiser.storage_final_min_kg)
-        if storage_enabled else 0.0
+        if storage_enabled
+        else 0.0
     )
     optimistic_delivery = optimistic_production + initial_inventory_credit
     required = optimiser.hourly_demand_kg * len(wind) * optimiser.dt
