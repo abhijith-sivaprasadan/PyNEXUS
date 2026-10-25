@@ -36,8 +36,25 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
         raise FileExistsError("Output already exists; research runs never overwrite results")
     historical = json.loads(HISTORICAL.read_text(encoding="utf-8"))
     expected = historical["input_sha256"]
-    if sha256(INPUTS) != expected:
-        raise RuntimeError("Archived 2023 input bytes do not match historical manifest")
+    source_bytes = INPUTS.read_bytes()
+    observed = hashlib.sha256(source_bytes).hexdigest()
+    lf_bytes = source_bytes.replace(b"\\r\\n", b"\\n")
+    windows_line_ending_sha256 = hashlib.sha256(
+        lf_bytes.replace(b"\\n", b"\\r\\n")
+    ).hexdigest()
+    posix_line_ending_sha256 = hashlib.sha256(lf_bytes).hexdigest()
+    if observed == expected:
+        historical_input_mode = "BYTE_IDENTICAL"
+    elif windows_line_ending_sha256 == expected:
+        historical_input_mode = "LINE_ENDINGS_ONLY_WINDOWS_CRLF"
+    elif posix_line_ending_sha256 == expected:
+        historical_input_mode = "LINE_ENDINGS_ONLY_POSIX_LF"
+    else:
+        raise RuntimeError(
+            "Historical input digest mismatch, NOT ACCEPTED: "
+            f"expected={expected}, checked_out={observed}, "
+            f"lf={posix_line_ending_sha256}, crlf={windows_line_ending_sha256}"
+        )
     if not CONFIG.is_file():
         raise FileNotFoundError(CONFIG)
 
@@ -76,6 +93,8 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
         "reference_manifest_sha256": sha256(HISTORICAL),
         "reference_config_sha256": sha256(CONFIG),
         "input_sha256": sha256(INPUTS),
+        "original_manifest_input_sha256": expected,
+        "historical_input_verification_mode": historical_input_mode,
         "git_sha": revision.stdout.strip() if revision.returncode == 0 else None,
         "python_packages": {
             x: importlib.metadata.version(x) for x in ("pyomo", "highspy", "numpy", "pandas")
