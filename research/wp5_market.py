@@ -28,6 +28,57 @@ PRICE_COLUMN = "price_eur_mwh"
 TIME_COLUMN = "timestamp_utc"
 
 
+def price_coverage_diagnostics(prices):
+    """Explain a rejected provider calendar without assuming or repairing missing data.
+
+    Contains UTC timestamps and counts only, never the token, request URLs,
+    or non-public provider exception messages. The result is NOT accepted data.
+    """
+    if not isinstance(prices, pd.Series) or not isinstance(prices.index, pd.DatetimeIndex):
+        raise ValueError("Provider diagnostics require a datetime-indexed Series")
+    if prices.index.tz is None:
+        raise ValueError("Provider diagnostics require timezone-aware timestamps")
+    utc = prices.index.tz_convert("UTC")
+    inside = utc[(utc >= START) & (utc < END)]
+    unique = inside.unique().sort_values()
+    missing = EXPECTED.difference(unique)
+    unexpected = unique.difference(EXPECTED)
+    # Pandas 2/3 may store datetime64 at different internal resolutions.
+    # Timedelta arithmetic is unit-aware, unlike dividing .asi8 by nanoseconds.
+    deltas = pd.Series(inside).diff().dropna().dt.total_seconds().to_numpy() / 60
+    counts = pd.Series(deltas).value_counts().sort_index()
+    within_year = prices.iloc[np.flatnonzero((utc >= START) & (utc < END))]
+    numerical = pd.to_numeric(within_year, errors="coerce").to_numpy(dtype=float)
+
+    def sample(stamps):
+        return [stamp.isoformat() for stamp in stamps[:8]]
+
+    return {
+        "status": "REJECTED_PROVIDER_CALENDAR_DIAGNOSTIC_NOT_VERIFIED_DATA",
+        "expected_hour_count_2023_utc": len(EXPECTED),
+        "provider_rows_total_including_bracketing_days": len(prices),
+        "provider_timezone": str(prices.index.tz),
+        "provider_first_timestamp_utc": utc[0].isoformat() if len(utc) else None,
+        "provider_last_timestamp_utc": utc[-1].isoformat() if len(utc) else None,
+        "in_year_rows": len(inside),
+        "in_year_unique_timestamps": len(unique),
+        "in_year_duplicate_count": len(inside) - len(unique),
+        "missing_exact_hour_count": len(missing),
+        "first_missing_exact_hours_utc": sample(missing),
+        "unexpected_in_year_timestamp_count": len(unexpected),
+        "first_unexpected_timestamps_utc": sample(unexpected),
+        "first_in_year_timestamps_utc": sample(inside),
+        "last_in_year_timestamps_utc": sample(inside[-8:]),
+        "successive_interval_minutes_counts": {
+            str(float(interval)): int(count) for interval, count in counts.items()
+        },
+        "nonfinite_or_nonnumeric_in_year_prices": int((~np.isfinite(numerical)).sum()),
+        "negative_in_year_price_count": int((numerical < 0).sum()),
+        "provider_raw_xml_archived": False,
+        "imputation_or_resampling_performed": False,
+    }
+
+
 def normalise_hourly_prices(prices):
     """Require an exact chronological 8,760-hour UTC grid; no silent resampling."""
     if not isinstance(prices, pd.Series) or not isinstance(prices.index, pd.DatetimeIndex):
@@ -145,12 +196,26 @@ def load_snapshot(directory):
     return result, manifest
 
 
-def fetch_official_snapshot(output):
+def fetch_official_snapshot(output, *, diagnostics_dir=None):
     # Local market request deliberately brackets the 2023 UTC year. Query
     # includes extra local days at both ends so time-zone offsets cannot
     # silently omit the 2023-12-31 23:00 UTC interval.
     series, metadata = fetch_entsoe_prices("NL", "2022-12-31", "2024-01-01", "Europe/Amsterdam")
-    return write_snapshot(output, series, metadata=metadata)
+    try:
+        return write_snapshot(output, series, metadata=metadata)
+    except ValueError:
+        # Do not invent/fill prices. Preserve only a safely sanitized calendar
+        # diagnosis for an explicitly rejected provider response.
+        diagnosis = price_coverage_diagnostics(series)
+        print("Rejected ENTSO-E A44 2023 calendar:", json.dumps(diagnosis), flush=True)
+        if diagnostics_dir is not None:
+            diagnostics_dir = Path(diagnostics_dir)
+            diagnostics_dir.mkdir(parents=True, exist_ok=False)
+            (diagnostics_dir / "coverage_diagnostics.json").write_text(
+                json.dumps(diagnosis, indent=2, sort_keys=True, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
+        raise
 
 
 def run_market_case(snapshot, output, *, scenario="baseline", hours=8760, time_limit=600):
@@ -249,6 +314,7 @@ def main(argv=None):
     subs = parser.add_subparsers(dest="command", required=True)
     fetch = subs.add_parser("fetch", help="Fetch NL 2023 A44 using ENTSOE_API_KEY")
     fetch.add_argument("--output", type=Path, required=True)
+    fetch.add_argument("--diagnostics-dir", type=Path)
     run = subs.add_parser("dispatch", help="Re-solve one or all registered cases")
     run.add_argument("--snapshot", type=Path, required=True)
     run.add_argument("--output", type=Path, required=True)
@@ -257,7 +323,7 @@ def main(argv=None):
     run.add_argument("--time-limit", type=int, default=600)
     args = parser.parse_args(argv)
     if args.command == "fetch":
-        result = fetch_official_snapshot(args.output)
+        result = fetch_official_snapshot(args.output, diagnostics_dir=args.diagnostics_dir)
     else:
         result = run_market_case(
             args.snapshot,

@@ -11,9 +11,11 @@ from research.wp5_market import (
     EXPECTED,
     START,
     TIME_COLUMN,
+    fetch_official_snapshot,
     load_snapshot,
     normalise_hourly_prices,
     parse_snapshot_csv,
+    price_coverage_diagnostics,
     write_snapshot,
 )
 
@@ -115,3 +117,65 @@ def test_no_reuse_output(tmp_path):
     write_snapshot(root, synthetic_utc_prices(), metadata=META)
     with pytest.raises(FileExistsError):
         write_snapshot(root, synthetic_utc_prices(), metadata=copy.deepcopy(META))
+
+
+def test_diagnostics_pinpoint_single_missing_utc_hour():
+    prices = synthetic_utc_prices().drop(EXPECTED[145])
+    diagnosis = price_coverage_diagnostics(prices)
+    assert diagnosis["status"].startswith("REJECTED_PROVIDER")
+    assert diagnosis["in_year_rows"] == 8759
+    assert diagnosis["missing_exact_hour_count"] == 1
+    assert diagnosis["first_missing_exact_hours_utc"] == [EXPECTED[145].isoformat()]
+    assert diagnosis["unexpected_in_year_timestamp_count"] == 0
+    assert diagnosis["nonfinite_or_nonnumeric_in_year_prices"] == 0
+    assert diagnosis["imputation_or_resampling_performed"] is False
+
+
+def test_diagnostics_reveal_fully_quarter_hourly_source():
+    quarter_hours = pd.date_range(START, END, freq="15min", inclusive="left")
+    prices = pd.Series(40.0, index=quarter_hours)
+    diagnosis = price_coverage_diagnostics(prices)
+    assert diagnosis["in_year_rows"] == 35040
+    assert diagnosis["missing_exact_hour_count"] == 0
+    assert diagnosis["unexpected_in_year_timestamp_count"] == 26280
+    assert diagnosis["successive_interval_minutes_counts"]["15.0"] == 35039
+    with pytest.raises(ValueError, match="nonhourly"):
+        normalise_hourly_prices(prices)
+
+
+def test_rejected_provider_calendar_archives_diagnostics_only(monkeypatch, tmp_path, capsys):
+    import json
+
+    import research.wp5_market as market
+
+    prices = synthetic_utc_prices().drop(EXPECTED[300])
+
+    def fake_provider(*args, **kwargs):
+        return prices, {"bidding_zone": "NL", "document_type": "A44"}
+
+    monkeypatch.setattr(market, "fetch_entsoe_prices", fake_provider)
+    source = tmp_path / "rejected"
+    diagnostics_dir = tmp_path / "diagnostics"
+    with pytest.raises(ValueError, match="Missing/extra"):
+        fetch_official_snapshot(source, diagnostics_dir=diagnostics_dir)
+    assert not source.exists()
+    result = json.loads((diagnostics_dir / "coverage_diagnostics.json").read_text())
+    assert result["missing_exact_hour_count"] == 1
+    assert result["first_missing_exact_hours_utc"] == [EXPECTED[300].isoformat()]
+    assert "securityToken" not in capsys.readouterr().out
+    assert list(diagnostics_dir.iterdir()) == [diagnostics_dir / "coverage_diagnostics.json"]
+
+
+def test_valid_provider_calendar_writes_only_verified_prices(monkeypatch, tmp_path):
+    import research.wp5_market as market
+
+    def fake_provider(*args, **kwargs):
+        return synthetic_utc_prices(), META
+
+    monkeypatch.setattr(market, "fetch_entsoe_prices", fake_provider)
+    source = tmp_path / "valid"
+    diagnostics_dir = tmp_path / "diagnostics"
+    result = fetch_official_snapshot(source, diagnostics_dir=diagnostics_dir)
+    assert result["row_count"] == 8760
+    assert not diagnostics_dir.exists()
+    assert (source / "prices.csv").is_file()
