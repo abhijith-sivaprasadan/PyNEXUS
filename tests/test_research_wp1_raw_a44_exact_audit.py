@@ -12,14 +12,14 @@ def a03(start, end, points="1:5.0,4:-10.0", *, zone="10YNL----------L", curve="A
     )
     return (
         f'<Publication_MarketDocument xmlns="urn:test"><type>A44</type>'
-        f'<TimeSeries><in_Domain.mRID>{zone}</in_Domain.mRID>'
-        f'<out_Domain.mRID>{zone}</out_Domain.mRID>'
-        f'<currency_Unit.name>EUR</currency_Unit.name>'
-        f'<price_Measure_Unit.name>MWH</price_Measure_Unit.name>'
-        f'<curveType>{curve}</curveType><Period><timeInterval>'
-        f'<start>{start}</start><end>{end}</end></timeInterval>'
-        f'<resolution>PT60M</resolution>{tags}</Period></TimeSeries>'
-        f'</Publication_MarketDocument>'
+        f"<TimeSeries><in_Domain.mRID>{zone}</in_Domain.mRID>"
+        f"<out_Domain.mRID>{zone}</out_Domain.mRID>"
+        f"<currency_Unit.name>EUR</currency_Unit.name>"
+        f"<price_Measure_Unit.name>MWH</price_Measure_Unit.name>"
+        f"<curveType>{curve}</curveType><Period><timeInterval>"
+        f"<start>{start}</start><end>{end}</end></timeInterval>"
+        f"<resolution>PT60M</resolution>{tags}</Period></TimeSeries>"
+        f"</Publication_MarketDocument>"
     ).encode("utf-8")
 
 
