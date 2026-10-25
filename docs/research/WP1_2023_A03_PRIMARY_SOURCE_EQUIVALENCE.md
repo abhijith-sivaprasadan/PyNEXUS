@@ -42,7 +42,19 @@ All original XML entries used `A44`, `A03`, `PT60M`, NL domain
 `10YNL----------L`, currency EUR and price unit EUR/MWh. All 14
 original XML files matched their manifest-recorded SHA-256 checksums.
 
-### Original reported "missing hour" — fully explained
+### Distinguish the original missing Pandas timestamp from an A03 compressed price
+
+**Correction to the earlier interpretation:** the original rejected year-spanning
+PandasClient response was missing **2023-12-29 23:00 UTC**, which corresponds
+to **2023-12-30 00:00 CET**, as proved by the exact dated workflow
+[40204281501](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40204281501).
+The A03 compressed position below is instead **2023-12-30 08:00 UTC**.
+They are **nine hours apart**, not the same point. The former is an
+explicit first-position price in the original day-ahead source, while the
+latter is a source-defined constant block price. The *mechanism* causing
+the year-spanning client to omit 23:00 UTC is not proven from this A03
+observation alone. The processed 8,760-hour price series is still
+source-equivalent in all values, so prior dispatch outputs do not change.
 
 The official XML for **local Dutch delivery date 2023-12-30**
 (`Period` beginning `2023-12-29T23:00Z`) has price points at positions
@@ -54,13 +66,13 @@ The official XML for **local Dutch delivery date 2023-12-30**
   defined by the unchanged value of position 9.
 - Source position 11: `2023-12-30 09:00 UTC`, **€53.00/MWh**.
 
-The prior large-window `entsoe-py` response omitted an hourly index
-record at this specific position, causing a strict 8,759/8,760 coverage
-failure. The later short-window official A44 retrieval returned the
-correct value independently, and all 72 overlapping processed prices
-agreed. The original **A03 block semantics** now explain why the
-underlying source XML has 23 `Point` entries for this 24-hour Period.
-No need to speculate that the original provider data was incomplete.
+The original **A03 block semantics** explain why the XML has 23
+`Point` entries instead of 24 for this delivery day. Separately,
+the later short-window official A44 retrieval recovered the
+**23:00 UTC** value and all 72 overlapping processed prices agreed.
+Both facts are independently verified, but one does not establish the
+cause of the other. The annual source equivalence result remains
+8,760/8,760 identical processed market prices.
 
 This is a significant closure of the WP1/WP5 **primary-market-data
 provenance gate**. It does **not** close the CDS ERA5 original hourly wind
