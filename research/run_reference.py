@@ -38,9 +38,9 @@ def reference_run(output, *, time_limit_seconds=600, mip_rel_gap=1e-4):
     expected = historical["input_sha256"]
     source_bytes = INPUTS.read_bytes()
     observed = hashlib.sha256(source_bytes).hexdigest()
-    lf_bytes = source_bytes.replace(b"\\r\\n", b"\\n")
+    lf_bytes = source_bytes.replace(b"\r\n", b"\n")
     windows_line_ending_sha256 = hashlib.sha256(
-        lf_bytes.replace(b"\\n", b"\\r\\n")
+        lf_bytes.replace(b"\n", b"\r\n")
     ).hexdigest()
     posix_line_ending_sha256 = hashlib.sha256(lf_bytes).hexdigest()
     if observed == expected:
