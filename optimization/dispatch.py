@@ -370,8 +370,9 @@ class ElectrolyzerDispatchOptimizer:
                 )
                 model.c_grid_export_exclusive = pyo.Constraint(
                     model.T,
-                    rule=lambda m, t: m.g_exp[t]
-                    <= self.grid_connection_mw * (1 - m.grid_import_mode[t]),
+                    rule=lambda m, t: (
+                        m.g_exp[t] <= self.grid_connection_mw * (1 - m.grid_import_mode[t])
+                    ),
                 )
         else:
 
