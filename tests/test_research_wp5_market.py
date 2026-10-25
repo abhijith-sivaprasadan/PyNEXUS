@@ -18,6 +18,7 @@ from research.wp5_market import (
     parse_snapshot_csv,
     price_coverage_diagnostics,
     recover_from_independent_a44_query,
+    select_market_cases,
     write_snapshot,
 )
 
@@ -272,3 +273,16 @@ def test_failed_official_requery_keeps_research_gate_closed(tmp_path, monkeypatc
     diagnosis = json.loads((tmp_path / "diagnostics/coverage_diagnostics.json").read_text())
     assert diagnosis["missing_exact_hour_count"] == 1
     assert diagnosis["independent_a44_requery_outcome"].startswith("REJECTED_ValueError")
+
+
+def test_combined_all_intervention_is_one_registered_case():
+    from research.interventions import registered_cases
+
+    choices = registered_cases(["W", "E", "G", "S", "eta"])
+    assert select_market_cases(choices, "all") == [
+        ("all", ("W", "E", "G", "S", "eta"))
+    ]
+    assert select_market_cases(choices, "all-cases") == choices
+    assert len(select_market_cases(choices, "all-cases")) == 17
+    with pytest.raises(ValueError, match="Unregistered scenario"):
+        select_market_cases(choices, "ALL")
