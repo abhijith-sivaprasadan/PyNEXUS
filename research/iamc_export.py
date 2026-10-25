@@ -60,7 +60,9 @@ def load_registered_wp4(path):
     raw = path.read_bytes()
     observed = hashlib.sha256(raw).hexdigest()
     if observed != WP4_ANALYSIS_SHA256:
-        raise ValueError("WP4 synthesis bytes differ from the independently verified archived artifact")
+        raise ValueError(
+            "WP4 synthesis bytes differ from the independently verified archived artifact"
+        )
     result = json.loads(raw)
     if (
         result.get("schema_version") != "pynexus.wp4.interannual.v1"
@@ -116,9 +118,10 @@ def validate_synthesis(result, demand_per_day_kg):
         )
         if metric.get("provider") != "Open-Meteo explicit ERA5 (NOT original CDS-2023 input)":
             raise ValueError("WP4 source identity altered")
-        if not isinstance(metric.get("source_api_sha256"), str) or len(
-            metric["source_api_sha256"]
-        ) != 64:
+        if (
+            not isinstance(metric.get("source_api_sha256"), str)
+            or len(metric["source_api_sha256"]) != 64
+        ):
             raise ValueError("Missing source weather SHA-256")
         for row in rows:
             if row.get("hours") != hours:
