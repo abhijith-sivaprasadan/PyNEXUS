@@ -1,6 +1,6 @@
 # WP5 completion track — priced scenarios, marginal thresholds and observed-price redispatch
 
-**Implementation status (2026-10-25):** The original financial accounting framework is unit-tested but financial coefficients remain unsourced. The new `research.wp5_thresholds` can produce a **source-free mathematical marginal threshold** from verified 2023 records; `research.wp5_market` can fetch *processed* Netherlands day-ahead prices with an owner's ENTSO-E API token and then re-solve registered configurations. Neither should be described as a bankable LCOH. **No real ENTSO-E year is fetched or market-dispatch claim made by the CI workflow.**
+**Implementation and evidence status (2026-10-25):** The original financial accounting framework remains unit-tested but financial coefficients are unsourced. `research.wp5_thresholds` generates a synthetic-price marginal accounting comparison. **Real processed NL A44 2023 prices have now been acquired and validated in a manual GitHub Actions run, and full-year observed-price Stage A/B redispatch has successfully completed for baseline, E and E+S.** The regular pull-request CI remains hermetic and does not query ENTSO-E. See [the independently audited 2023 storage comparison](WP5_OBSERVED_PRICE_2023_E_VS_ES.md) for run links, checksums and the limited €5.12/kg incremental wholesale-settlement interpretation. None of these amounts constitutes an LCOH, a contractual price or bankable economics.
 
 ## A. Marginal threshold before vendor cost evidence
 
@@ -25,6 +25,8 @@ The fetch requests NL day-ahead A44 from `2022-12-31` through `2024-01-01` local
 
 The existing `data.entsoe` module requests whole local market days rather than an exact UTC year; the new strict adapter provides an independent UTC gate.
 
+**Confirmed real-data status:** The first whole-year A44 response omitted one timestamp, `2023-12-29 23:00 UTC` (`2023-12-30 00:00 CET`). The manual acquisition workflow issued an independent official NL A44 requery for the surrounding local dates, retrieved the missing observation explicitly, verified all 72 overlapping prices and preserved supplementary observations with a checksum. All 8,760 processed hourly prices then passed strict UTC validation. Price CSV SHA-256: `2dfea4651fce314893201e7b08a4ae0ad24deef6b69ef85d81d9f54428f95bb2`. **The original ENTSO-E A44 XML is still not archived.**
+
 ## C. Run fresh dispatch against observed price input
 
 ```bash
@@ -41,6 +43,8 @@ The pipeline reconstructs the original 2023 wind/config source with hash checks,
 **Calendar assumption requiring independent audit:** the original archival CDS-derived 2023 8,760-row wind file is interpreted as chronological UTC beginning 2023-01-01 00:00. Preserve and check the original weather ingestion manifest before assigning market dispatch as definitive hourly alignment.
 
 The internal WP2 writer names the settlement field SYNTHETIC; WP5B rewrites the output record to `stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT` and stores the input-price checksum. The underlying optimization objective is **net wholesale grid settlement only**; no tariffs, balancing, renewable hydrogen eligibility, measured output, actual plant contract, or total project economics is inferred.
+
+**Completed annual cases:** baseline [run 40207056315](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40207056315), E [run 40217860564](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40217860564), and E+S [run 40216993086](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40216993086). Independently checked exact hourly rows and saved SHA-256, solver statuses, physical verifiers, no simultaneous import/export and hourly net-settlement arithmetic. **E+S improves annual delivery by 343.79 tonnes against E at +€1.759 million modeled net wholesale grid settlement (≈ €5.12/additional kg).** This is a conditional one-year wholesale-price accounting comparison *excluding storage capex and operating cost*. The other 14 registered cases have not yet been run using 2023 observed prices.
 
 ## D. External cost evidence register, current source screen
 
