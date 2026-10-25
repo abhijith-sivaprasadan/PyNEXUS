@@ -1,0 +1,74 @@
+name: WP4 complete engineering sensitivity matrix (full-year)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wp4-full-year-matrix.yml'
+permissions:
+  contents: read
+concurrency:
+  group: wp4-full-year-matrix-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  annual:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        case: [baseline, low_min_load, high_min_load, slow_ramp, fast_ramp, slow_storage_charge, fast_storage_charge, slow_storage_discharge, fast_storage_discharge, low_storage_loss, high_storage_loss, lower_pipeline_limit, higher_pipeline_limit, lower_daily_demand, higher_daily_demand, wind_available_90pct, wind_available_110pct]
+    name: "2023 8760h | ${{ matrix.case }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Run short-horizon integration checks
+        run: python -m pytest -q tests/test_research_engineering_sensitivity.py
+      - name: Solve and independently verify registered annual sensitivity
+        run: |
+          python -m research.engineering_sensitivity \
+            --case "${{ matrix.case }}" \
+            --hours 8760 --time-limit 1800 \
+            --output "wp4-engineering-${{ matrix.case }}-8760"
+      - name: Archive actual source/dispatch files and verification
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp4-engineering-full-year-${{ matrix.case }}
+          path: wp4-engineering-${{ matrix.case }}-8760/
+          if-no-files-found: warn
+          retention-days: 60
+  synthesis:
+    if: always()
+    needs: annual
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e '.[dev]'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wp4-engineering-full-year-*
+          path: wp4-annual-artifacts
+      - name: Verify 17 source-consistent scenario manifests and produce summary
+        run: |
+          python -m research.batch_evidence wp4 \
+            --input wp4-annual-artifacts --output wp4-complete-matrix
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp4-complete-engineering-matrix-synthesis
+          path: wp4-complete-matrix/
+          if-no-files-found: warn
+          retention-days: 60
