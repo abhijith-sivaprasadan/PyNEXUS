@@ -14,7 +14,7 @@ from optimization.dispatch import ElectrolyzerDispatchOptimizer
 from optimization.verification import verify_dispatch
 from research.interventions import PROTOCOL as WP2_PROTOCOL
 from research.interventions import config_for_case, source_inputs
-from research.run_reference import INPUTS, ROOT, sha256
+from research.run_reference import ROOT, sha256
 from research.run_weather_year import CASES, PROTOCOL
 from research.weather_source import convert_weather_to_wind_2023_model, validate_weather_payload
 
