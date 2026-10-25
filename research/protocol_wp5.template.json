@@ -1,0 +1,64 @@
+{
+  "schema_version": "pynexus.wp5.cost.v1",
+  "note": "INVALID UNTIL NULL COST ASSUMPTIONS ARE SOURCED. No default cost values.",
+  "currency": "EUR",
+  "price_year": 2025,
+  "discount_rate": null,
+  "discount_rate_source": "REPLACE_WITH_TRACEABLE_SOURCE",
+  "electricity_prices": "SYNTHETIC_2023_ARCHIVE",
+  "includes_grid_tariffs": false,
+  "variable_opex_eur_per_kg_delivered": null,
+  "variable_opex_source": "REPLACE_WITH_TRACEABLE_SOURCE",
+  "assets": {
+    "wind": {
+      "capex_eur_per_mw": null,
+      "fixed_opex_fraction": null,
+      "lifetime_years": null,
+      "sources": {
+        "capex_eur_per_mw": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "fixed_opex_fraction": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "lifetime_years": "REPLACE_WITH_TRACEABLE_SOURCE"
+      }
+    },
+    "electrolyser": {
+      "capex_eur_per_mw": null,
+      "fixed_opex_fraction": null,
+      "lifetime_years": null,
+      "sources": {
+        "capex_eur_per_mw": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "fixed_opex_fraction": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "lifetime_years": "REPLACE_WITH_TRACEABLE_SOURCE"
+      }
+    },
+    "grid_connection": {
+      "capex_eur_per_mw": null,
+      "fixed_opex_fraction": null,
+      "lifetime_years": null,
+      "sources": {
+        "capex_eur_per_mw": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "fixed_opex_fraction": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "lifetime_years": "REPLACE_WITH_TRACEABLE_SOURCE"
+      }
+    },
+    "hydrogen_storage": {
+      "capex_eur_per_kg": null,
+      "fixed_opex_fraction": null,
+      "lifetime_years": null,
+      "sources": {
+        "capex_eur_per_kg": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "fixed_opex_fraction": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "lifetime_years": "REPLACE_WITH_TRACEABLE_SOURCE"
+      }
+    },
+    "efficiency_upgrade": {
+      "capex_eur_per_mw": null,
+      "fixed_opex_fraction": null,
+      "lifetime_years": null,
+      "sources": {
+        "capex_eur_per_mw": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "fixed_opex_fraction": "REPLACE_WITH_TRACEABLE_SOURCE",
+        "lifetime_years": "REPLACE_WITH_TRACEABLE_SOURCE"
+      }
+    }
+  }
+}
