@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from optimization.verification import verify_dispatch
+from research.physical_bounds import optimistic_shortfall_lower_bound_kg
 
 
 def solve_adequacy_first(
@@ -54,6 +55,11 @@ def solve_adequacy_first(
     tol = default_tol if numerical_slack_kg is None else float(numerical_slack_kg)
     if not np.isfinite(tol) or tol < 0:
         raise ValueError("numerical_slack_kg must be finite and nonnegative")
+    lower_bound = optimistic_shortfall_lower_bound_kg(
+        optimiser, wind, grid_enabled=True, storage_enabled=enable_storage,
+    )
+    if float(stage_a["objective_value"]) + 1e-4 < lower_bound:
+        raise RuntimeError("Stage A violates independent physical shortfall bound")
     cap = float(stage_a["objective_value"]) + tol
 
     stage_b = optimiser.optimize(
@@ -74,6 +80,7 @@ def solve_adequacy_first(
         raise RuntimeError("Stage B exceeded the declared adequacy allowance")
     return {
         "total_demand_kg": total_demand,
+        "optimistic_shortfall_lower_bound_kg": lower_bound,
         "stage_a_unserved_kg": float(stage_a["objective_value"]),
         "stage_b_unserved_kg": final_unserved,
         "numerical_allowance_kg": tol,
