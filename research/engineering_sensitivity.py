@@ -101,7 +101,9 @@ def run_case(case, output, *, hours=24, time_limit=600):
         "case_input_sha256": sha256(input_file),
         "revision": subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=False
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout.strip(),
         "not_claimed": "Not empirical uncertainty, not real market price, not LCOH",
     }
@@ -120,23 +122,26 @@ def run_case(case, output, *, hours=24, time_limit=600):
             stage["results_df"].to_csv(file, index=False)
             stage_hashes[label] = sha256(file)
         demand = result["total_demand_kg"]
-        manifest.update({
-            "status": (
-                "VERIFIED_ANNUAL_ENGINEERING_SCREENING"
-                if hours == 8760 else "VERIFIED_PARTIAL_24H_SMOKE_NOT_ANNUAL"
-            ),
-            "stage_dispatch_sha256": stage_hashes,
-            "stage_a_status": a["status"],
-            "stage_b_status": b["status"],
-            "stage_a_verified": result["verification_a"]["passed"],
-            "stage_b_verified": result["verification_b"]["passed"],
-            "stage_a_unserved_kg": result["stage_a_unserved_kg"],
-            "stage_a_unserved_fraction": result["stage_a_unserved_kg"] / demand,
-            "stage_b_grid_settlement_eur_SYNTHETIC": result["stage_b_grid_settlement_eur"],
-            "demand_kg": demand,
-            "grid_import_mwh": float(b["results_df"]["grid_import_mw"].sum() * opt.dt),
-            "grid_export_mwh": float(b["results_df"]["grid_export_mw"].sum() * opt.dt),
-        })
+        manifest.update(
+            {
+                "status": (
+                    "VERIFIED_ANNUAL_ENGINEERING_SCREENING"
+                    if hours == 8760
+                    else "VERIFIED_PARTIAL_24H_SMOKE_NOT_ANNUAL"
+                ),
+                "stage_dispatch_sha256": stage_hashes,
+                "stage_a_status": a["status"],
+                "stage_b_status": b["status"],
+                "stage_a_verified": result["verification_a"]["passed"],
+                "stage_b_verified": result["verification_b"]["passed"],
+                "stage_a_unserved_kg": result["stage_a_unserved_kg"],
+                "stage_a_unserved_fraction": result["stage_a_unserved_kg"] / demand,
+                "stage_b_grid_settlement_eur_SYNTHETIC": result["stage_b_grid_settlement_eur"],
+                "demand_kg": demand,
+                "grid_import_mwh": float(b["results_df"]["grid_import_mw"].sum() * opt.dt),
+                "grid_export_mwh": float(b["results_df"]["grid_export_mw"].sum() * opt.dt),
+            }
+        )
     except Exception as exc:
         manifest["failure_classification"] = type(exc).__name__
         raise
@@ -155,8 +160,13 @@ def main(argv=None):
     parser.add_argument("--time-limit", type=int, default=600)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
-    print(json.dumps(run_case(args.case, args.output, hours=args.hours, time_limit=args.time_limit),
-                     indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            run_case(args.case, args.output, hours=args.hours, time_limit=args.time_limit),
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
