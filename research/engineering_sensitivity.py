@@ -13,7 +13,6 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import yaml
 
 from optimization.dispatch import ElectrolyzerDispatchOptimizer
