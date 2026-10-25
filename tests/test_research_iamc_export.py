@@ -7,8 +7,8 @@ import pytest
 
 from research.iamc_export import (
     SCENARIOS,
-    YEARS,
     WP4_ANALYSIS_SHA256,
+    YEARS,
     build_iamc_rows,
     load_registered_wp4,
     validate_synthesis,
