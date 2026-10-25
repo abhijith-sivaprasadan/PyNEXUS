@@ -1,6 +1,6 @@
 # WP5 completion track — priced scenarios, marginal thresholds and observed-price redispatch
 
-**Implementation and evidence status (2026-10-25):** The original financial accounting framework remains unit-tested but financial coefficients are unsourced. `research.wp5_thresholds` generates a synthetic-price marginal accounting comparison. **Real processed NL A44 2023 prices have now been acquired and validated in a manual GitHub Actions run, and full-year observed-price Stage A/B redispatch has successfully completed for baseline, E and E+S.** The regular pull-request CI remains hermetic and does not query ENTSO-E. See [the independently audited 2023 storage comparison](WP5_OBSERVED_PRICE_2023_E_VS_ES.md) for run links, checksums and the limited €5.12/kg incremental wholesale-settlement interpretation. None of these amounts constitutes an LCOH, a contractual price or bankable economics.
+**Implementation and evidence status (2026-10-25):** The original financial accounting framework remains unit-tested but financial coefficients are unsourced. `research.wp5_thresholds` generates a synthetic-price marginal accounting comparison. **Observed NL A44 prices were independently reconstructed from the original XML (8,760/8,760 exact matches), and all 17 full-year observed-price Stage A/B optimisation jobs completed successfully in run 40229852457.** The original aggregate synthesis failed because the registered `all` case was incorrectly interpreted as a batch selector; the read-only recovery workflow now audits the combined case in the original artifact without re-solving or altering it. The regular pull-request CI remains hermetic and does not query ENTSO-E. See [the independently audited 2023 storage comparison](WP5_OBSERVED_PRICE_2023_E_VS_ES.md) for run links, checksums and the limited €5.12/kg incremental wholesale-settlement interpretation. None of these amounts constitutes an LCOH, a contractual price or bankable economics.
 
 ## A. Marginal threshold before vendor cost evidence
 
@@ -21,11 +21,11 @@ export ENTSOE_API_KEY='your_personal_key'
 python -m research.wp5_market fetch --output wp5-nl-2023-market-prices
 ```
 
-The fetch requests NL day-ahead A44 from `2022-12-31` through `2024-01-01` local market days, clips to **2023-01-01 00:00 UTC .. 2023-12-31 23:00 UTC** inclusive, and accepts exactly 8,760 ordered timestamps with no missing, duplicated, nonfinite or subhourly samples. Amsterdam DST transitions are addressed by conversion to UTC before validation; negative prices are accepted. Any 15/30-minute data require a separately registered and independently tested aggregation method. It records the transformed-price CSV SHA256 and provider-request metadata, but **does not preserve the ENTSO-E raw XML**. Consequently, it remains a processed-data provenance level. The repository does not contain an API token or market price archive.
+The fetch requests NL day-ahead A44 from `2022-12-31` through `2024-01-01` local market days, clips to **2023-01-01 00:00 UTC .. 2023-12-31 23:00 UTC** inclusive, and accepts exactly 8,760 ordered timestamps with no missing, duplicated, nonfinite or subhourly samples. Amsterdam DST transitions are addressed by conversion to UTC before validation; negative prices are accepted. Any 15/30-minute data require a separately registered and independently tested aggregation method. It records the transformed-price CSV SHA256 and provider-request metadata, and its original adapter did not preserve the raw XML. Later WP1 archival and A03-reconstruction workflows independently verified the original XML; see `WP1_2023_A03_PRIMARY_SOURCE_EQUIVALENCE.md`. Long-term external preservation remains outstanding. The repository does not contain an API token or market price archive.
 
 The existing `data.entsoe` module requests whole local market days rather than an exact UTC year; the new strict adapter provides an independent UTC gate.
 
-**Confirmed real-data status:** The first whole-year A44 response omitted one timestamp, `2023-12-29 23:00 UTC` (`2023-12-30 00:00 CET`). The manual acquisition workflow issued an independent official NL A44 requery for the surrounding local dates, retrieved the missing observation explicitly, verified all 72 overlapping prices and preserved supplementary observations with a checksum. All 8,760 processed hourly prices then passed strict UTC validation. Price CSV SHA-256: `2dfea4651fce314893201e7b08a4ae0ad24deef6b69ef85d81d9f54428f95bb2`. **The original ENTSO-E A44 XML is still not archived.**
+**Confirmed real-data status:** The first whole-year A44 response omitted one timestamp, `2023-12-29 23:00 UTC` (`2023-12-30 00:00 CET`). The manual acquisition workflow issued an independent official NL A44 requery for the surrounding local dates, retrieved the missing observation explicitly, verified all 72 overlapping prices and preserved supplementary observations with a checksum. All 8,760 processed hourly prices then passed strict UTC validation. Price CSV SHA-256: `2dfea4651fce314893201e7b08a4ae0ad24deef6b69ef85d81d9f54428f95bb2`. **The original ENTSO-E A44 XML was archived in a GitHub Actions artifact and independently validated against all 8,760 processed hourly prices** (PR #19). A permanent independent archive has not yet been established.
 
 ## C. Run fresh dispatch against observed price input
 
@@ -33,9 +33,10 @@ The existing `data.entsoe` module requests whole local market days rather than a
 # Short test horizon is explicitly not an annual result:
 python -m research.wp5_market dispatch --snapshot wp5-nl-2023-market-prices \
   --scenario baseline --hours 24 --output wp5-market-smoke
-# Genuine annual rerun; 17 registered cases may be costly:
+# Genuine annual combined-intervention case only:
 python -m research.wp5_market dispatch --snapshot wp5-nl-2023-market-prices \
-  --scenario all --hours 8760 --output wp5-market-2023-all
+  --scenario all --hours 8760 --output wp5-market-2023-combined
+# To solve every registered case in one directory, use --scenario all-cases.
 ```
 
 The pipeline reconstructs the original 2023 wind/config source with hash checks, swaps **only** the price input, and solves Stage A (physical shortfall minimum) and Stage B (net grid settlement at the new price series under adequacy constraint). It uses the existing independent dispatch verification and refuses any Stage B simultaneous grid import/export above the declared tolerance. An overlap rejection does not by itself fix the mixed-integer anti-circulation formulation; a future explicitly registered grid logic revision is needed for that stronger guarantee.
@@ -44,7 +45,7 @@ The pipeline reconstructs the original 2023 wind/config source with hash checks,
 
 The internal WP2 writer names the settlement field SYNTHETIC; WP5B rewrites the output record to `stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT` and stores the input-price checksum. The underlying optimization objective is **net wholesale grid settlement only**; no tariffs, balancing, renewable hydrogen eligibility, measured output, actual plant contract, or total project economics is inferred.
 
-**Completed annual cases:** baseline [run 40207056315](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40207056315), E [run 40217860564](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40217860564), and E+S [run 40216993086](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40216993086). Independently checked exact hourly rows and saved SHA-256, solver statuses, physical verifiers, no simultaneous import/export and hourly net-settlement arithmetic. **E+S improves annual delivery by 343.79 tonnes against E at +€1.759 million modeled net wholesale grid settlement (≈ €5.12/additional kg).** This is a conditional one-year wholesale-price accounting comparison *excluding storage capex and operating cost*. The other 14 registered cases have not yet been run using 2023 observed prices.
+**Completed annual cases:** baseline [run 40207056315](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40207056315), E [run 40217860564](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40217860564), and E+S [run 40216993086](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40216993086). Independently checked exact hourly rows and saved SHA-256, solver statuses, physical verifiers, no simultaneous import/export and hourly net-settlement arithmetic. **E+S improves annual delivery by 343.79 tonnes against E at +€1.759 million modeled net wholesale grid settlement (≈ €5.12/additional kg).** This is a conditional one-year wholesale-price accounting comparison *excluding storage capex and operating cost*. All 17 registered single-year cases were subsequently solved with 2023 observed prices in [run 40229852457](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40229852457). The 17 scenario jobs passed, but the synthesis failed due to the `all` selector collision; see the dedicated recovery workflow. A complete annualised system-cost frontier is still blocked by missing source-matched cost coefficients.
 
 ## D. External cost evidence register, current source screen
 
@@ -60,8 +61,8 @@ The internal WP2 writer names the settlement field SYNTHETIC; WP5B rewrites the 
 
 1. Audit EHO's actual 2025 100 MW PEM spreadsheet and source comparable per-asset capital, lifetime, maintenance and replacement intervals. Source and document exchange/price-year normalisation; do not reinterpret placeholders as prices.
 2. Obtain Dutch-specific grid marginal reinforcement cost and 20–40 t compressed H2 storage engineering-cost evidence with non-overlapping system boundaries. Investigate real technology basis and marginal expense of moving 70% to 75% LHV electrolyser efficiency.
-3. Acquire and permanently archive original ENTSO-E A44 XML with hashes, and externally audit archival wind-hour timing relative to actual UTC market hours.
-4. Run all 17 annual scenarios with actual prices and verify solver outputs, including no simultaneous import/export; compare physical adequacy to original archival solution.
+3. Transfer verified original ENTSO-E A44 XML from the ephemeral GitHub Actions artifact to a permanent research deposit. Complete the original CDS wind-hour source audit against UTC market hours.
+4. Complete the read-only synthesis recovery for all 17 already-solved observed-price annual scenarios; verify output checksums, identical sources and the combined intervention; compare physical adequacy against the original archive.
 5. Produce price-year-harmonised conditional cost–adequacy frontier, at least three financial sensitivity cases, replacement/degradation schedule and corrected storage marginal delivered-hydrogen cost.
 6. Review engineering validity and update the manuscript only after reproducibility gates. Do not call annualised accounting output bankable LCOH.
 
