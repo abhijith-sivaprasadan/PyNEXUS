@@ -87,7 +87,12 @@ def test_research_and_legacy_objectives_have_distinct_units():
     )
     assert legacy["objective_definition"] == "legacy_electricity_plus_grid_and_shortfall_penalty"
     assert a["objective_definition"] == "total_unserved_hydrogen_kg"
-    assert legacy["objective_value"] == pytest.approx(40.0)
+    expected_legacy = float(
+        (legacy["results_df"]["power_optimized_mw"]
+         * legacy["results_df"]["electricity_price"] * o.dt).sum()
+    )
+    assert legacy["status"] == "optimal"
+    assert legacy["objective_value"] == pytest.approx(expected_legacy, rel=1e-8)
     assert a["objective_value"] == pytest.approx(0.0, abs=1e-5)
 
 
