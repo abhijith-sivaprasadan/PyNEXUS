@@ -62,7 +62,18 @@ jobs:
       - name: Fetch A44 price series for Netherlands and validate exact UTC coverage
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
-        run: python -m research.wp5_market fetch --output wp5-nl-2023-market-prices
+        run: |
+          python -m research.wp5_market fetch \
+            --output wp5-nl-2023-market-prices \
+            --diagnostics-dir wp5-nl-2023-rejected-calendar-diagnostics
+      - name: Archive rejected provider-calendar diagnosis when validation fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp5-nl-2023-REJECTED-unverified-calendar-diagnostics
+          path: wp5-nl-2023-rejected-calendar-diagnostics/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify saved 2023 evidence is loadable and hash consistent
         run: |
           python - <<'PY'
