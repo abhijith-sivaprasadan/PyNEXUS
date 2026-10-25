@@ -71,9 +71,9 @@ def matrix():
         "hours": 8760,
         "is_full_year": True,
         "price_data_kind": "synthetic_daily_sinusoid_NOT_historical_market_data",
-        "cases": [record(name, active) for name, active in registered_cases(
-            ["W", "E", "G", "S", "eta"]
-        )],
+        "cases": [
+            record(name, active) for name, active in registered_cases(["W", "E", "G", "S", "eta"])
+        ],
     }
 
 
@@ -98,9 +98,7 @@ def test_one_year_hand_calculated_economics_with_synthetic_price_flag():
     assert value["annual_fixed_opex_eur"] == pytest.approx(52)
     assert value["annual_variable_opex_eur"] == pytest.approx(900)
     assert value["annual_cost_eur_ILLUSTRATIVE"] == pytest.approx(1262)
-    assert value["unit_cost_eur_per_kg_delivered_ILLUSTRATIVE"] == pytest.approx(
-        1262 / 900
-    )
+    assert value["unit_cost_eur_per_kg_delivered_ILLUSTRATIVE"] == pytest.approx(1262 / 900)
 
 
 def test_efficiency_premium_added_not_assumed_free():
@@ -154,11 +152,20 @@ def test_complete_registration_and_explicit_acknowledgment_required():
 
 def test_pareto_removes_strictly_dominated_options():
     points = [
-        {"scenario": "a", "annual_cost_eur_ILLUSTRATIVE": 10,
-         "adequacy_shortfall_fraction_stage_a": 0.2},
-        {"scenario": "b", "annual_cost_eur_ILLUSTRATIVE": 20,
-         "adequacy_shortfall_fraction_stage_a": 0.1},
-        {"scenario": "c", "annual_cost_eur_ILLUSTRATIVE": 30,
-         "adequacy_shortfall_fraction_stage_a": 0.3},
+        {
+            "scenario": "a",
+            "annual_cost_eur_ILLUSTRATIVE": 10,
+            "adequacy_shortfall_fraction_stage_a": 0.2,
+        },
+        {
+            "scenario": "b",
+            "annual_cost_eur_ILLUSTRATIVE": 20,
+            "adequacy_shortfall_fraction_stage_a": 0.1,
+        },
+        {
+            "scenario": "c",
+            "annual_cost_eur_ILLUSTRATIVE": 30,
+            "adequacy_shortfall_fraction_stage_a": 0.3,
+        },
     ]
     assert pareto_frontier(points) == ["a", "b"]
