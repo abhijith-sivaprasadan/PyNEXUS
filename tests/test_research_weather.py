@@ -23,8 +23,11 @@ from research.weather_source import (
 
 def payload(year, *, missing=False, duplicated=False, unit="m/s"):
     idx = pd.date_range(
-        f"{year}-01-01", f"{year + 1}-01-01",
-        inclusive="left", tz="UTC", freq="h",
+        f"{year}-01-01",
+        f"{year + 1}-01-01",
+        inclusive="left",
+        tz="UTC",
+        freq="h",
     )
     times = idx.strftime("%Y-%m-%dT%H:%M").tolist()
     if missing:
