@@ -1,4 +1,5 @@
 """WP7 evidence and numerical-claim guards; archived end-to-end CI is separate."""
+
 import json
 
 import pytest
@@ -14,7 +15,7 @@ def test_matrix_registration_and_hashes():
 
 def test_refuse_untrusted_synthesis(tmp_path):
     doc = tmp_path / "summary.json"
-    doc.write_text(json.dumps({"status":"COMPLETE_REGISTERED_MATRIX"}))
+    doc.write_text(json.dumps({"status": "COMPLETE_REGISTERED_MATRIX"}))
     with pytest.raises(ValueError, match="SHA-256"):
         pinned_json(doc, SHA["wp2_summary"], "WP2")
     with pytest.raises(ValueError, match="SHA-256"):
@@ -34,7 +35,9 @@ def test_unresolved_result_placeholders_fail(tmp_path):
     page.write_text("{baseline_shortfall_pct} {es_extra_delivery_t}")
     with pytest.raises(ValueError, match="Missing registered"):
         render_markdown(page, {"baseline_shortfall_pct": "15.9"})
-    actual = render_markdown(page, {"baseline_shortfall_pct":"15.9", "es_extra_delivery_t":"343.79"})
+    actual = render_markdown(
+        page, {"baseline_shortfall_pct": "15.9", "es_extra_delivery_t": "343.79"}
+    )
     assert actual == "15.9 343.79"
 
 
@@ -42,4 +45,4 @@ def test_declared_placeholder_must_not_survive_rendering(tmp_path):
     page = tmp_path / "paper.md"
     page.write_text("{baseline_shortfall_pct}")
     with pytest.raises(ValueError, match="Unresolved"):
-        render_markdown(page, {"baseline_shortfall_pct":"{baseline_fake}"})
+        render_markdown(page, {"baseline_shortfall_pct": "{baseline_fake}"})
