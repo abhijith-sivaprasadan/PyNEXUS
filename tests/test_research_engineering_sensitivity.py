@@ -1,6 +1,5 @@
 """Hermetic tests for registered, controlled WP4 engineering experiments."""
 
-import copy
 import json
 
 import numpy as np
