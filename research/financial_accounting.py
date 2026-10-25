@@ -58,7 +58,11 @@ def annuity_factor(rate, lifetime_years):
 
 
 def source_text(text, label):
-    if not isinstance(text, str) or len(text.strip()) < 6:
+    if (
+        not isinstance(text, str)
+        or len(text.strip()) < 6
+        or any(token in text.upper() for token in ("REPLACE_", "PLACEHOLDER", "SOURCE_REQUIRED", "TODO", "TBD"))
+    ):
         raise ValueError(f"{label}: an identifiable source or 'ILLUSTRATIVE' is required")
     return text.strip()
 
