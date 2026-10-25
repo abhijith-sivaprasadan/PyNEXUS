@@ -88,6 +88,12 @@ Enabling storage/grid/heat adds their own charts (this is the same run, scrolled
 - `tests/` — fast component and optimisation tests
 - [Reproducibility and change evidence](docs/reproducibility.md)
 
+## Research work packages (WP1–WP6)
+
+The energy-technology research protocol is in [docs/research/RESEARCH_PROTOCOL.md](docs/research/RESEARCH_PROTOCOL.md). The repository implements adequacy-first dispatch and verification (WP1), 17 intervention combinations (WP2), independently checked constraint diagnostics (WP3), the five-year 2021–2025 weather experiment (WP4), a gated illustrative cost-accounting framework (WP5), and IAMC-compatible exchange of verified WP4 metrics (WP6). **No market-derived LCOH, official IAMC variable registry or observed plant data are claimed.**
+
+For the reproducible WP6 CSV export, see [WP6 protocol and commands](docs/research/WP6_IAMC_PROTOCOL.md) and [the local variable dictionary](research/wp6_variables.json). The registered WP4 synthesis must match the pinned historical artifact hash; the exporter runs a full `pyam` write/read round trip before accepting the output.
+
 ## Contributing
 
 See `CONTRIBUTING.md`. Calculation changes require tests and explicit units. Never change physics, constraints, data, or solver tolerances merely to obtain a preferred result.

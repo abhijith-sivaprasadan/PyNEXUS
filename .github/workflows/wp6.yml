@@ -1,0 +1,68 @@
+name: WP6 verified IAMC exchange and pyam roundtrip
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wp6-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-roundtrip:
+    name: IAMC and pyam (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -e '.[dev,iamc]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q tests/test_research_iamc_export.py
+
+  verified-synthesis-export:
+    name: Export verified WP4 synthesis, check pyam and archive CSV
+    needs: unit-and-roundtrip
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev,iamc]'
+      - name: Retrieve archived verified WP4 synthesis (not replayed dispatch)
+        uses: actions/download-artifact@v4
+        with:
+          name: wp4-2021-2025-interannual-synthesis
+          run-id: 40157038537
+          github-token: ${{ github.token }}
+          path: wp4-verified-source
+      - name: Verify source hash, arithmetic, export full IAMC and pyam round-trip
+        run: |
+          python -m research.iamc_export \
+            --wp4-synthesis wp4-verified-source/analysis.json \
+            --output wp6-iamc-output
+      - name: Preserve CSV, variable dictionary and provenance hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp6-iamc-verified-exchange
+          path: wp6-iamc-output/
+          if-no-files-found: warn
+          retention-days: 60
