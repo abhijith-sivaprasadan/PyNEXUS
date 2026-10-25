@@ -40,11 +40,11 @@ def perturb_config(base, entry, source):
     if name == "wind_availability_multiplier":
         if not 0 < value <= 1.5:
             raise ValueError("Wind scaling must be positive and bounded")
-        wind = data["wind_available_mw"].to_numpy(dtype=float) * value
         installed = base["wind_turbine"]["rated_power_mw"] * base["wind_turbine"]["n_turbines"]
-        if np.any(wind > installed + 1e-6):
-            raise ValueError("Scaled wind exceeds unchanged turbine nameplate")
-        data["wind_available_mw"] = wind
+        wind = data["wind_available_mw"].to_numpy(dtype=float) * value
+        # Keep fixed nameplate, clipping an optimistic recovery-of-losses
+        # multiplier rather than introducing an unregistered capacity increase.
+        data["wind_available_mw"] = np.minimum(wind, installed)
         return config, data
     parts = name.split(".")
     if len(parts) != 2 or parts[0] not in config or parts[1] not in config[parts[0]]:
