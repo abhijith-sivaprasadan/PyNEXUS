@@ -122,3 +122,44 @@ def test_adequacy_wrapper_fails_on_unacceptable_gap():
     o.mip_gap = 0.01
     with pytest.raises(ValueError, match="mip_rel_gap"):
         solve_adequacy_first(o, [100.0], [10.0], enable_storage=False)
+
+
+
+def test_exclusive_grid_mode_guarantees_no_simultaneous_exchange_at_negative_prices():
+    o = opt()
+    run = solve_adequacy_first(
+        o,
+        [60.0, 0.0, 90.0],
+        [-50.0, 200.0, -5.0],
+        enable_storage=False,
+        grid_exchange_mode="exclusive",
+    )
+    assert run["grid_exchange_mode"] == "exclusive"
+    for name in ("stage_a", "stage_b"):
+        result = run[name]
+        df = result["results_df"]
+        assert result["grid_exchange_mode"] == "exclusive"
+        assert result["status"] == "optimal"
+        assert result["binary_variables"] >= 2 * len(df)
+        assert np.max(
+            np.minimum(df["grid_import_mw"], df["grid_export_mw"])
+        ) <= 1e-6
+    assert run["verification_a"]["passed"] and run["verification_b"]["passed"]
+
+
+def test_grid_mode_is_opt_in_and_cannot_relabel_legacy_objective():
+    o = opt()
+    old = o.optimize(
+        [70.0], [5.0], objective="minimize_unserved", demand_mode="hourly",
+        enable_grid=True,
+    )
+    assert old["grid_exchange_mode"] == "legacy"
+    with pytest.raises(ValueError, match="grid_exchange_mode"):
+        o.optimize([70.0], [5.0], grid_exchange_mode="unknown")
+    with pytest.raises(ValueError, match="research objective"):
+        o.optimize([70.0], [5.0], grid_exchange_mode="exclusive", enable_grid=True)
+    with pytest.raises(ValueError, match="grid-enabled"):
+        o.optimize(
+            [70.0], [5.0], objective="minimize_unserved",
+            demand_mode="hourly", grid_exchange_mode="exclusive",
+        )
