@@ -1,0 +1,57 @@
+name: WP1 recover and audit primary 2023 CDS ERA5 wind
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wp1-cds-primary-wind-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: github.ref == 'refs/heads/main'
+    name: Re-request 12 native CDS NetCDF monthly fields and compare against original 8760h dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[data,dev]'
+      - name: Run timestamp and negative-control tests
+        run: python -m pytest -q tests/test_research_wp1_cds_wind_audit.py
+      - name: Confirm primary CDS API key exists
+        env:
+          CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$CDSAPI_KEY" ]; then
+            echo "::error::CDSAPI_KEY is required to recover the archived raw CDS monthly source. Never enter it in workflow inputs or logs."
+            exit 1
+          fi
+      - name: Recover exact 2023 CDS source requests and audit the original dispatch
+        env:
+          CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+          CDSAPI_URL: https://cds.climate.copernicus.eu/api
+        run: |
+          python -m research.wp1_cds_wind_audit \
+            --raw-dir cds-original-2023 \
+            --output wp1-cds-2023-hour-audit \
+            --refetch
+      - name: Preserve source audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp1-cds-2023-primary-utc-wind-audit
+          path: wp1-cds-2023-hour-audit/
+          retention-days: 60
+          if-no-files-found: warn
+      - name: Preserve recovered primary monthly NetCDF files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp1-cds-2023-primary-monthly-netcdf
+          path: cds-original-2023/*.nc
+          retention-days: 60
+          if-no-files-found: warn
