@@ -109,10 +109,9 @@ def expand_official_a03_xml(xml_bytes):
                 points.append((pos, price))
         if not points or points[0][0] != 1:
             raise ValueError("No valid A03 block at first market position")
-        if any(
-            index < 1 or index > hours
-            for index, _ in points
-        ) or any(left[0] >= right[0] for left, right in zip(points, points[1:])):
+        if any(index < 1 or index > hours for index, _ in points) or any(
+            left[0] >= right[0] for left, right in zip(points, points[1:])
+        ):
             raise ValueError("Invalid, unordered or duplicated A03 block positions")
         if len(points) < hours:
             compressed_periods += 1
@@ -156,9 +155,8 @@ def verify_primary_source(raw_dir, processed_dir):
     for segment in entries:
         source_file = raw_dir / segment["file"]
         data = source_file.read_bytes()
-        if (
-            len(data) != segment.get("bytes")
-            or hashlib.sha256(data).hexdigest() != segment.get("sha256")
+        if len(data) != segment.get("bytes") or hashlib.sha256(data).hexdigest() != segment.get(
+            "sha256"
         ):
             raise ValueError("Original A44 source document hash mismatch")
         values, metadata = expand_official_a03_xml(data)
