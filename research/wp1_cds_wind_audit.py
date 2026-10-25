@@ -96,8 +96,12 @@ def audit_cds_year(raw_dir, output, *, refetch=False):
         # CDSAPI_KEY, private URLs or raw provider exception messages.
         try:
             fetch_era5_year_monthly(
-                52.5, 3.5, base_cfg["location"]["era5_grid_resolution"], 2023,
-                cache_dir=raw_dir, max_concurrent=2,
+                52.5,
+                3.5,
+                base_cfg["location"]["era5_grid_resolution"],
+                2023,
+                cache_dir=raw_dir,
+                max_concurrent=2,
             )
         except Exception as exc:
             raise RuntimeError(
@@ -116,9 +120,7 @@ def audit_cds_year(raw_dir, output, *, refetch=False):
         file = candidates[0]
         digest = sha256(file)
         byte_equal.append(digest == rec["file_sha256"])
-        frame, spatial = load_era5_wind(
-            file, 52.5, 3.5, "Europe/Amsterdam", start, end
-        )
+        frame, spatial = load_era5_wind(file, 52.5, 3.5, "Europe/Amsterdam", start, end)
         if (
             spatial["latitude"] != rec["spatial_point"]["grid_cell_center_latitude"]
             or spatial["longitude"] != rec["spatial_point"]["grid_cell_center_longitude"]
@@ -130,15 +132,17 @@ def audit_cds_year(raw_dir, output, *, refetch=False):
         if frame.shape[0] != rec["row_count"]["actual"]:
             raise ValueError("Recovered CDS month does not match source row count")
         originals.append(frame)
-        source_rows.append({
-            "first_utc": utc[0].isoformat(),
-            "last_utc": utc[-1].isoformat(),
-            "month": start[:7],
-            "expected_original_file_sha256": rec["file_sha256"],
-            "recovered_file_sha256": digest,
-            "byte_identical": byte_equal[-1],
-            "hour_count": len(frame),
-        })
+        source_rows.append(
+            {
+                "first_utc": utc[0].isoformat(),
+                "last_utc": utc[-1].isoformat(),
+                "month": start[:7],
+                "expected_original_file_sha256": rec["file_sha256"],
+                "recovered_file_sha256": digest,
+                "byte_identical": byte_equal[-1],
+                "hour_count": len(frame),
+            }
+        )
     data = pd.concat(originals, axis=0)
     wp2 = yaml.safe_load(PROTOCOL.read_text(encoding="utf-8"))
     archived, _, _ = source_inputs(wp2, hours=8760)
@@ -155,8 +159,10 @@ def audit_cds_year(raw_dir, output, *, refetch=False):
         "month_count": 12,
         "original_raw_bytes_all_identical": all(byte_equal),
         "source_records": source_rows,
-        "archived_dispatch_wind_source_sha256": sha256(CONFIG),
-        "frozen_original_input_csv_sha256": sha256(ROOT / "outputs/annual_2023/grid_storage_hourly/inputs.csv"),
+        "reference_configuration_sha256": sha256(CONFIG),
+        "frozen_original_input_csv_sha256": sha256(
+            ROOT / "outputs/annual_2023/grid_storage_hourly/inputs.csv"
+        ),
         **physical,
         "limitations": [
             "Re-delivered NetCDF bytes need not match the original even when hourly wind values agree",
@@ -180,7 +186,14 @@ def main(argv=None):
     parser.add_argument("--refetch", action="store_true")
     args = parser.parse_args(argv)
     result = audit_cds_year(args.raw_dir, args.output, refetch=args.refetch)
-    print(json.dumps({"status": result["status"], "max_abs_wind_difference_mw": result["max_abs_wind_difference_mw"]}))
+    print(
+        json.dumps(
+            {
+                "status": result["status"],
+                "max_abs_wind_difference_mw": result["max_abs_wind_difference_mw"],
+            }
+        )
+    )
     return 0
 
 
