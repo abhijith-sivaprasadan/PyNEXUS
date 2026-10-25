@@ -26,6 +26,77 @@ EXPECTED = pd.date_range(START, END, freq="h", inclusive="left")
 SCHEMA = "pynexus.wp5.nl_day_ahead_hourly_utc.v1"
 PRICE_COLUMN = "price_eur_mwh"
 TIME_COLUMN = "timestamp_utc"
+GAP_2023_UTC = pd.Timestamp("2023-12-29T23:00:00Z")
+
+
+def recover_from_independent_a44_query(annual_prices, targeted_prices):
+    """Accept only a second, matching ENTSO-E observation for the one known gap.
+
+    A wider yearly and an independently requested local-day A44 response must
+    agree on every overlapping hour. No interpolation or forward filling.
+    """
+    for label, series in (("annual", annual_prices), ("targeted", targeted_prices)):
+        if not isinstance(series, pd.Series) or not isinstance(series.index, pd.DatetimeIndex):
+            raise ValueError(f"{label} A44 source must be a datetime-indexed Series")
+        if series.index.tz is None or series.index.has_duplicates:
+            raise ValueError(f"{label} A44 source timestamps must be aware and unique")
+        if not series.index.is_monotonic_increasing:
+            raise ValueError(f"{label} A44 source timestamps must be sorted")
+
+    def to_utc_year(prices):
+        utc = prices.index.tz_convert("UTC")
+        keep = (utc >= START) & (utc < END)
+        data = pd.Series(
+            pd.to_numeric(prices.iloc[np.flatnonzero(keep)], errors="raise").to_numpy(
+                dtype=float
+            ),
+            index=utc[keep],
+        )
+        if not np.isfinite(data.to_numpy()).all():
+            raise ValueError("A44 requery contained nonfinite price observations")
+        if len(data.index.difference(EXPECTED)):
+            raise ValueError("A44 requery contained off-hour observations")
+        return data
+
+    annual = to_utc_year(annual_prices)
+    candidate = to_utc_year(targeted_prices)
+    missing = EXPECTED.difference(annual.index)
+    if len(missing) != 1 or missing[0] != GAP_2023_UTC:
+        raise ValueError("Recovery permits only the registered 2023-12-29 23:00 UTC gap")
+    if GAP_2023_UTC not in candidate.index:
+        raise ValueError("Targeted independent ENTSO-E A44 query did not return the missing hour")
+    # Two immediate adjacent observations are mandatory, as well as at
+    # least 12 matching independent price observations overall.
+    neighbors = (GAP_2023_UTC - pd.Timedelta(hours=1), GAP_2023_UTC + pd.Timedelta(hours=1))
+    if any(ts not in candidate.index or ts not in annual.index for ts in neighbors):
+        raise ValueError("Targeted A44 query omitted a neighboring control hour")
+    overlap = candidate.index.intersection(annual.index)
+    if len(overlap) < 12:
+        raise ValueError("Targeted A44 query has too few independent overlap controls")
+    differences = abs(candidate.loc[overlap].to_numpy() - annual.loc[overlap].to_numpy())
+    largest_difference = float(differences.max())
+    if not np.all(differences <= 1e-6):
+        raise ValueError(
+            "Original and targeted official A44 responses disagree on overlapping prices"
+        )
+    merged = pd.concat([annual, candidate.loc[[GAP_2023_UTC]]]).sort_index()
+    normalise_hourly_prices(merged)  # independent strict 8,760-hour check
+    audit = {
+        "status": "RECOVERED_EXPLICITLY_OBSERVED_A44_PRICE_NOT_INTERPOLATED",
+        "method": "SECOND_OFFICIAL_NL_A44_QUERY_WITH_FULL_OVERLAP_CONSISTENCY_CHECK",
+        "recovered_utc_timestamp": GAP_2023_UTC.isoformat(),
+        "recovered_local_timestamp": GAP_2023_UTC.tz_convert(
+            "Europe/Amsterdam"
+        ).isoformat(),
+        "recovered_price_eur_per_mwh": float(candidate.loc[GAP_2023_UTC]),
+        "recovered_observation_count": 1,
+        "independent_overlap_hour_count": int(len(overlap)),
+        "maximum_overlap_price_difference_eur_mwh": largest_difference,
+        "price_interpolation_or_forward_fill": False,
+    }
+    return merged, audit
+
+
 
 
 def price_coverage_diagnostics(prices):
@@ -126,7 +197,7 @@ def parse_snapshot_csv(path):
     return normalise_hourly_prices(prices)
 
 
-def write_snapshot(output, prices, *, metadata):
+def write_snapshot(output, prices, *, metadata, targeted_evidence=None, recovery_audit=None):
     """Write a new immutable processed-price archive, hash-lock its CSV."""
     output = Path(output)
     if output.exists():
@@ -137,6 +208,20 @@ def write_snapshot(output, prices, *, metadata):
     output.mkdir(parents=True, exist_ok=False)
     target = output / "prices.csv"
     normalised.to_csv(target, index=False)
+    evidence_hash = None
+    if targeted_evidence is not None:
+        if recovery_audit is None:
+            raise ValueError("Additional A44 source evidence requires its verification audit")
+        evidence_index = targeted_evidence.index.tz_convert("UTC")
+        extra = pd.DataFrame(
+            {
+                TIME_COLUMN: evidence_index.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                PRICE_COLUMN: targeted_evidence.to_numpy(dtype=float),
+            }
+        )
+        evidence_path = output / "independent_a44_targeted_observations.csv"
+        extra.to_csv(evidence_path, index=False)
+        evidence_hash = sha256(evidence_path)
     manifest = {
         "schema_version": SCHEMA,
         "status": "PROCESSED_PROVIDER_TIMESERIES_NOT_RAW_XML",
@@ -156,6 +241,14 @@ def write_snapshot(output, prices, *, metadata):
         "csv_sha256": sha256(target),
         "retrieved_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "provider_request": metadata,
+        "verified_source_gap_recovery": (
+            {
+                **recovery_audit,
+                "independent_targeted_observations_sha256": evidence_hash,
+            }
+            if recovery_audit is not None
+            else None
+        ),
         "limitations": [
             "ENTSOE PandasClient-parsed provider response; original A44 XML not archived",
             "Not an invoice, PPA, electricity purchase cost or carbon-intensity record",
@@ -197,16 +290,44 @@ def load_snapshot(directory):
 
 
 def fetch_official_snapshot(output, *, diagnostics_dir=None):
-    # Local market request deliberately brackets the 2023 UTC year. Query
-    # includes extra local days at both ends so time-zone offsets cannot
-    # silently omit the 2023-12-31 23:00 UTC interval.
+    # Bracket the UTC 2023 year using complete Dutch local market dates.
     series, metadata = fetch_entsoe_prices("NL", "2022-12-31", "2024-01-01", "Europe/Amsterdam")
     try:
-        return write_snapshot(output, series, metadata=metadata)
+        normalise_hourly_prices(series)
     except ValueError:
-        # Do not invent/fill prices. Preserve only a safely sanitized calendar
-        # diagnosis for an explicitly rejected provider response.
         diagnosis = price_coverage_diagnostics(series)
+        # The first real 2023 A44 run revealed one exact missing local midnight
+        # (2023-12-30 00:00 CET). Only attempt an independent source requery
+        # for this known gap, never invent a price.
+        if (
+            diagnosis["missing_exact_hour_count"] == 1
+            and diagnosis["first_missing_exact_hours_utc"] == [GAP_2023_UTC.isoformat()]
+            and diagnosis["unexpected_in_year_timestamp_count"] == 0
+            and diagnosis["in_year_duplicate_count"] == 0
+        ):
+            try:
+                targeted, targeted_request = fetch_entsoe_prices(
+                    "NL", "2023-12-29", "2023-12-31", "Europe/Amsterdam"
+                )
+                complete, recovery = recover_from_independent_a44_query(series, targeted)
+                print(
+                    "Official targeted A44 requery recovered an observed hour; "
+                    f"cross-checked {recovery['independent_overlap_hour_count']} overlapping "
+                    "observations; no interpolation or assumed prices.",
+                    flush=True,
+                )
+                return write_snapshot(
+                    output,
+                    complete,
+                    metadata={**metadata, "supplementary_a44_request": targeted_request},
+                    targeted_evidence=targeted,
+                    recovery_audit=recovery,
+                )
+            except (RuntimeError, ValueError) as exc:
+                # No API-token-bearing upstream error strings reach the log.
+                diagnosis["independent_a44_requery_outcome"] = (
+                    f"REJECTED_{type(exc).__name__}; no market price was inserted"
+                )
         print("Rejected ENTSO-E A44 2023 calendar:", json.dumps(diagnosis), flush=True)
         if diagnostics_dir is not None:
             diagnostics_dir = Path(diagnostics_dir)
@@ -216,6 +337,7 @@ def fetch_official_snapshot(output, *, diagnostics_dir=None):
                 encoding="utf-8",
             )
         raise
+    return write_snapshot(output, series, metadata=metadata)
 
 
 def run_market_case(snapshot, output, *, scenario="baseline", hours=8760, time_limit=600):
