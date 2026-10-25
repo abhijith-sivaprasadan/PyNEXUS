@@ -7,6 +7,7 @@ shortfall plus a declared numerical tolerance.
 The economics exclude onsite wind CAPEX/OPEX and opportunity costs.
 This module does not claim a project-wide levelised hydrogen cost.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -44,8 +45,13 @@ def solve_adequacy_first(
     if stage_a["status"] != "optimal":
         raise RuntimeError(f"Stage A did not solve to reported optimality: {stage_a['status']}")
     verified_a = verify_dispatch(
-        optimiser, stage_a["results_df"], stage_a["objective_value"],
-        "minimize_unserved", "hourly", enable_grid=True, enable_storage=enable_storage,
+        optimiser,
+        stage_a["results_df"],
+        stage_a["objective_value"],
+        "minimize_unserved",
+        "hourly",
+        enable_grid=True,
+        enable_storage=enable_storage,
     )
     if not verified_a["passed"]:
         raise RuntimeError(f"Independent Stage A verification failed: {verified_a['checks']}")
@@ -56,21 +62,33 @@ def solve_adequacy_first(
     if not np.isfinite(tol) or tol < 0:
         raise ValueError("numerical_slack_kg must be finite and nonnegative")
     lower_bound = optimistic_shortfall_lower_bound_kg(
-        optimiser, wind, grid_enabled=True, storage_enabled=enable_storage,
+        optimiser,
+        wind,
+        grid_enabled=True,
+        storage_enabled=enable_storage,
     )
     if float(stage_a["objective_value"]) + 1e-4 < lower_bound:
         raise RuntimeError("Stage A violates independent physical shortfall bound")
     cap = float(stage_a["objective_value"]) + tol
 
     stage_b = optimiser.optimize(
-        wind, prices, objective="minimize_cash_cost", shortfall_cap_kg=cap, **common,
+        wind,
+        prices,
+        objective="minimize_cash_cost",
+        shortfall_cap_kg=cap,
+        **common,
     )
     if stage_b["status"] != "optimal":
         raise RuntimeError(f"Stage B did not solve to reported optimality: {stage_b['status']}")
     verified_b = verify_dispatch(
-        optimiser, stage_b["results_df"], stage_b["objective_value"],
-        "minimize_cash_cost", "hourly", enable_grid=True,
-        enable_storage=enable_storage, shortfall_cap_kg=cap,
+        optimiser,
+        stage_b["results_df"],
+        stage_b["objective_value"],
+        "minimize_cash_cost",
+        "hourly",
+        enable_grid=True,
+        enable_storage=enable_storage,
+        shortfall_cap_kg=cap,
     )
     if not verified_b["passed"]:
         raise RuntimeError(f"Independent Stage B verification failed: {verified_b['checks']}")
