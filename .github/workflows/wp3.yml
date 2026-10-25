@@ -1,0 +1,50 @@
+name: WP3 constraint attribution
+
+on:
+  pull_request:
+    branches:
+      - research/wp2-intervention-matrix
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wp3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: WP3 verified attribution from frozen WP2 artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q tests/test_research_attribution.py
+      - name: Retrieve immutable WP2 experimental artifact
+        run: |
+          mkdir -p wp2-frozen-input
+          gh run download 40148299968 --repo "${{ github.repository }}" --name wp2-2023-17-case-study --dir wp2-frozen-input
+          test -f wp2-frozen-input/summary.json
+      - name: Verify all physical records and calculate WP3 diagnostics
+        run: python -m research.attribution --wp2-dir wp2-frozen-input --output wp3-analysis
+      - name: Archive all attribution data and qualified research write-up
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp3-2023-constraint-attribution
+          path: wp3-analysis/
+          if-no-files-found: warn
