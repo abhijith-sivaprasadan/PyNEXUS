@@ -87,10 +87,10 @@ jobs:
           cache: pip
       - run: python -m pip install -e '.[dev]'
       - name: Reproduce new annual two-stage research run
-        run: python -m research.run_reference --output .research-annual-output --time-limit-seconds 600 --mip-rel-gap 0.0001
+        run: python -m research.run_reference --output research-annual-output --time-limit-seconds 600 --mip-rel-gap 0.0001
       - name: Archive the full reproducibility evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wp1-annual-adequacy-reference
-          path: .research-annual-output/
+          path: research-annual-output/
