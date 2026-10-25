@@ -65,18 +65,15 @@ def verify_wp4(folder, scenario):
     if not np.isclose(
         tables["stage_a"]["demand_slack_kg_h"].sum(),
         record["stage_a_unserved_kg"],
-        rtol=0, atol=1e-3,
+        rtol=0,
+        atol=1e-3,
     ):
         raise ValueError("WP4 hourly hydrogen shortfall differs from manifest")
     net = tables["stage_b"]["grid_import_mw"] - tables["stage_b"]["grid_export_mw"]
     cost = float((net * tables["stage_b"]["electricity_price"]).sum())
-    if not np.isclose(
-        cost, record["stage_b_grid_settlement_eur_SYNTHETIC"], rtol=0, atol=0.01
-    ):
+    if not np.isclose(cost, record["stage_b_grid_settlement_eur_SYNTHETIC"], rtol=0, atol=0.01):
         raise ValueError("WP4 synthetic wholesale settlement differs from hourly dispatch")
-    overlap = np.minimum(
-        tables["stage_b"]["grid_import_mw"], tables["stage_b"]["grid_export_mw"]
-    )
+    overlap = np.minimum(tables["stage_b"]["grid_import_mw"], tables["stage_b"]["grid_export_mw"])
     if float(overlap.max()) > 1e-6:
         raise ValueError("WP4 simultaneous grid import/export observed")
     return {
@@ -114,14 +111,8 @@ def verify_wp5(folder, scenario):
         rec["status"] != "VERIFIED_TWO_STAGE_SOLVE"
         or rec["scenario"] != scenario
         or rec["price_csv_sha256"] != EXPECTED_PRICE_SHA
-        or any(
-            rec[f"solver_{stage}"]["termination_condition"] != "optimal"
-            for stage in ("a", "b")
-        )
-        or any(
-            set(rec[f"verification_{stage}"].values()) != {True}
-            for stage in ("a", "b")
-        )
+        or any(rec[f"solver_{stage}"]["termination_condition"] != "optimal" for stage in ("a", "b"))
+        or any(set(rec[f"verification_{stage}"].values()) != {True} for stage in ("a", "b"))
     ):
         raise ValueError("WP5 source solver/verification failed")
     tables = {
@@ -146,13 +137,14 @@ def verify_wp5(folder, scenario):
         raise ValueError("WP5 simultaneous import and export")
     settlement = float(
         (
-            (stage_b["grid_import_mw"] - stage_b["grid_export_mw"])
-            * stage_b["electricity_price"]
+            (stage_b["grid_import_mw"] - stage_b["grid_export_mw"]) * stage_b["electricity_price"]
         ).sum()
     )
     if not np.isclose(
-        settlement, m["stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT"],
-        rtol=0, atol=0.01,
+        settlement,
+        m["stage_b_grid_settlement_eur_OBSERVED_PRICE_INPUT"],
+        rtol=0,
+        atol=0.01,
     ):
         raise ValueError("WP5 annual price settlement not supported by hourly dispatch")
     return {
@@ -187,9 +179,7 @@ def generate(kind, input_dir, output_dir):
     names = expected_names(kind)
     if len(names) != 17 or len(set(names)) != 17:
         raise ValueError("Expected exactly the 17 registered cases")
-    observed = {
-        p.name for p in input_dir.iterdir() if p.is_dir()
-    } if input_dir.is_dir() else set()
+    observed = {p.name for p in input_dir.iterdir() if p.is_dir()} if input_dir.is_dir() else set()
     prefix = "wp4-engineering-full-year-" if kind == "wp4" else "wp5-observed-full-year-"
     expected = {prefix + name for name in names}
     if observed != expected:
@@ -201,8 +191,8 @@ def generate(kind, input_dir, output_dir):
     records = [fn(input_dir, name) for name in names]
     hash_keys = (
         ("source_sha256", "protocol_sha256")
-        if kind == "wp4" else
-        ("price_csv_sha256", "source_wind_sha256", "base_config_sha256")
+        if kind == "wp4"
+        else ("price_csv_sha256", "source_wind_sha256", "base_config_sha256")
     )
     if any(len({r[key] for r in records}) != 1 for key in hash_keys):
         raise ValueError("Annual scenarios use different base sources or protocols")
@@ -223,8 +213,8 @@ def generate(kind, input_dir, output_dir):
         "source_hour_alignment_independently_verified": False,
         "study_scope": (
             "ONE_FACTOR_2023_WITH_SYNTHETIC_PRICES_NOT_EMPIRICAL_UNCERTAINTY"
-            if kind == "wp4" else
-            "2023_NL_A44_WHOLESALE_PRICE_NO_CAPEX_NO_TARIFF"
+            if kind == "wp4"
+            else "2023_NL_A44_WHOLESALE_PRICE_NO_CAPEX_NO_TARIFF"
         ),
         "fully_costed_adequacy_frontier_established": False,
         "records": records,
