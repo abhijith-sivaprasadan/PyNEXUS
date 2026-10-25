@@ -81,3 +81,23 @@ jobs:
           path: wp7-manuscript/
           if-no-files-found: warn
           retention-days: 60
+
+  formatter-snapshot:
+    name: Prepare pinned Ruff-formatted WP7 source
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install ruff==0.16.5
+      - run: ruff check --fix research/paper_wp7.py tests/test_research_paper_wp7.py
+      - run: ruff format research/paper_wp7.py tests/test_research_paper_wp7.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp7-autoformatted-source
+          path: |
+            research/paper_wp7.py
+            tests/test_research_paper_wp7.py
+          retention-days: 1
