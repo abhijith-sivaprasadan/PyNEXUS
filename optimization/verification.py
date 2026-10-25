@@ -13,6 +13,7 @@ def verify_dispatch(
     enable_storage=False,
     enable_grid=False,
     enable_heat=False,
+    shortfall_cap_kg=None,
 ):
     tolerance = 1e-5
     p = frame["power_optimized_mw"].to_numpy(dtype=float)
@@ -52,8 +53,12 @@ def verify_dispatch(
             and np.all(g_exp >= -tolerance)
         )
         cost = p * frame["electricity_price"].to_numpy(dtype=float) * dt
-        cost = cost + g_imp * frame["electricity_price"].to_numpy(dtype=float) * dt
-        cost = cost - g_exp * frame["electricity_price"].to_numpy(dtype=float) * dt
+        if objective == "minimize_cash_cost":
+            # Research cashflow excludes the historical price*electrolyser term.
+            cost = (g_imp - g_exp) * frame["electricity_price"].to_numpy(dtype=float) * dt
+        else:
+            cost = cost + g_imp * frame["electricity_price"].to_numpy(dtype=float) * dt
+            cost = cost - g_exp * frame["electricity_price"].to_numpy(dtype=float) * dt
     else:
         checks["wind_limits"] = bool(np.all(p <= wind + tolerance))
         checks["curtailment_identity"] = bool(
@@ -85,7 +90,12 @@ def verify_dispatch(
         else h2.sum() * dt >= opt.hourly_demand_kg * len(p) * dt - tolerance
     )
 
-    cost_objective = cost.sum() + opt.DEMAND_PENALTY * slack.sum() * dt
+    total_unserved_kg = float(slack.sum() * dt)
+    if shortfall_cap_kg is not None:
+        checks["shortfall_cap"] = bool(total_unserved_kg <= shortfall_cap_kg + tolerance)
+    cost_objective = float(cost.sum())
+    if objective == "minimize_cost":
+        cost_objective += opt.DEMAND_PENALTY * total_unserved_kg
     emissions_objective = None
     if carbon is not None:
         emissions = np.dot(p, carbon) * dt + opt.DEMAND_PENALTY * slack.sum() * dt
@@ -142,7 +152,12 @@ def verify_dispatch(
             boiler_emissions = (opt.boiler_emission_factor_kg_co2_per_mwh * q_boiler * dt).sum()
             emissions_objective = emissions_objective + boiler_emissions + heat_penalty
 
-    recomputed = cost_objective if objective == "minimize_cost" else emissions_objective
+    if objective == "minimize_unserved":
+        recomputed = total_unserved_kg
+    elif objective in {"minimize_cost", "minimize_cash_cost"}:
+        recomputed = cost_objective
+    else:
+        recomputed = emissions_objective
     checks["objective_recomputed"] = bool(
         recomputed is not None
         and np.isclose(objective_value, recomputed, atol=tolerance, rtol=1e-8)

@@ -218,6 +218,7 @@ class ElectrolyzerDispatchOptimizer:
         enable_grid: bool = False,
         enable_heat: bool = False,
         heat_demand_mw: np.ndarray = None,
+        shortfall_cap_kg: float | None = None,
     ) -> dict:
         """
         Run MILP optimization.
@@ -229,7 +230,8 @@ class ElectrolyzerDispatchOptimizer:
         electricity_prices : np.ndarray
             Day-ahead electricity price (EUR/MWh).
         objective : str
-            "minimize_cost" or "minimize_emissions"
+            "minimize_cost" or "minimize_emissions" (legacy), or research objectives
+            "minimize_unserved" / "minimize_cash_cost".
         demand_mode : str
             "hourly" (soft per-hour) or "cumulative" (hard total)
         carbon_intensity : np.ndarray, optional
@@ -256,6 +258,10 @@ class ElectrolyzerDispatchOptimizer:
             Required when enable_heat=True: thermal demand (MW-th) at each
             timestep, same length as wind_power_mw.
 
+        shortfall_cap_kg : float, optional
+            Maximum total unmet hydrogen (kg); required only for research
+            minimize_cash_cost. It should come from a separate adequacy solve.
+
         Returns
         -------
         dict with solution data and results DataFrame
@@ -278,6 +284,24 @@ class ElectrolyzerDispatchOptimizer:
             raise ValueError("wind_power_mw must be non-negative")
         if demand_mode not in {"hourly", "cumulative"}:
             raise ValueError(f"Unknown demand_mode: {demand_mode}")
+        if objective in {"minimize_unserved", "minimize_cash_cost"}:
+            if demand_mode != "hourly":
+                raise ValueError("Research objectives require hourly demand mode")
+            if enable_heat:
+                raise ValueError("Research objectives do not yet support heat coupling")
+        if objective == "minimize_cash_cost":
+            if not enable_grid:
+                raise ValueError("Grid-settlement cost requires enable_grid=True")
+            if (
+                shortfall_cap_kg is None
+                or not np.isfinite(shortfall_cap_kg)
+                or shortfall_cap_kg < 0
+            ):
+                raise ValueError(
+                    "minimize_cash_cost requires a finite nonnegative shortfall_cap_kg"
+                )
+        elif shortfall_cap_kg is not None:
+            raise ValueError("shortfall_cap_kg only applies to minimize_cash_cost")
         if objective == "minimize_emissions" and carbon_intensity is None:
             raise ValueError("carbon_intensity required")
         if carbon_intensity is not None:
@@ -499,8 +523,32 @@ class ElectrolyzerDispatchOptimizer:
 
             model.c_demand = pyo.Constraint(rule=h2_demand_cumul)
 
-        # Objective
-        if objective == "minimize_cost":
+        # Research objective stage B: preserve a separately solved physical
+        # adequacy optimum while choosing the least-cost grid settlement.
+        if objective == "minimize_cash_cost":
+            model.c_shortfall_cap = pyo.Constraint(
+                expr=sum(model.demand_slack[t] * self.dt for t in model.T) <= shortfall_cap_kg
+            )
+
+        # Keep historical objectives byte-for-byte unchanged; new research
+        # objectives have distinct names and must not be mixed with old EUR KPIs.
+        if objective == "minimize_unserved":
+            model.objective = pyo.Objective(
+                expr=sum(model.demand_slack[t] * self.dt for t in model.T),
+                sense=pyo.minimize,
+            )
+        elif objective == "minimize_cash_cost":
+            # Grid purchase payments minus export receipts ONLY. The historical
+            # term price*p would double-count purchases if interpreted as
+            # actual money paid when generation and grid flows are balanced.
+            # Onsite wind CAPEX/OPEX and opportunity cost are out of scope.
+            model.objective = pyo.Objective(
+                expr=sum(
+                    model.price[t] * (model.g_imp[t] - model.g_exp[t]) * self.dt for t in model.T
+                ),
+                sense=pyo.minimize,
+            )
+        elif objective == "minimize_cost":
 
             def cost_obj(model):
                 terms = sum(model.price[t] * model.p[t] * self.dt for t in model.T) + sum(
@@ -616,8 +664,11 @@ class ElectrolyzerDispatchOptimizer:
             curtailment_mw = np.array([pyo.value(model.curtail[t]) for t in range(T)])
             grid_import_mw = np.array([pyo.value(model.g_imp[t]) for t in range(T)])
             grid_export_mw = np.array([pyo.value(model.g_exp[t]) for t in range(T)])
-            cost_profile = cost_profile + electricity_prices * grid_import_mw * self.dt
-            cost_profile = cost_profile - electricity_prices * grid_export_mw * self.dt
+            if objective == "minimize_cash_cost":
+                cost_profile = electricity_prices * (grid_import_mw - grid_export_mw) * self.dt
+            else:
+                cost_profile = cost_profile + electricity_prices * grid_import_mw * self.dt
+                cost_profile = cost_profile - electricity_prices * grid_export_mw * self.dt
         else:
             curtailment_mw = wind_power_mw - power_schedule
             grid_import_mw = np.zeros(T)
@@ -673,6 +724,13 @@ class ElectrolyzerDispatchOptimizer:
             "enable_storage": enable_storage,
             "enable_grid": enable_grid,
             "enable_heat": enable_heat,
+            "objective_definition": {
+                "minimize_cost": "legacy_electricity_plus_grid_and_shortfall_penalty",
+                "minimize_emissions": "legacy_emissions_and_shortfall_penalty",
+                "minimize_unserved": "total_unserved_hydrogen_kg",
+                "minimize_cash_cost": "net_grid_settlement_eur_excludes_capex_opex",
+            }[objective],
+            "shortfall_cap_kg": shortfall_cap_kg,
         }
 
     def print_solution_summary(self, result: dict):

@@ -69,3 +69,28 @@ jobs:
         with:
           name: mpi-equivalence-results
           path: mpi-results/
+
+  wp1-annual-reference:
+    name: WP1 annual adequacy-first reference (Linux / Python 3.11)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Reproduce new annual two-stage research run
+        run: python -m research.run_reference --output research-annual-output --time-limit-seconds 600 --mip-rel-gap 0.0001
+      - name: Archive the full reproducibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp1-annual-adequacy-reference
+          path: research-annual-output/
