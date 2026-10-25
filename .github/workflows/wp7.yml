@@ -1,0 +1,83 @@
+name: WP7 source-audited research manuscript
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: wp7-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit:
+    name: WP7 formatting and research integrity tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q tests/test_research_paper_wp7.py
+  manuscript:
+    name: Verify archived hourly research and render final manuscript and figures
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Download verified full-year WP2 17-scenario hourly archive
+        uses: actions/download-artifact@v4
+        with:
+          name: wp2-2023-17-case-study
+          run-id: 40148299968
+          github-token: ${{ github.token }}
+          path: wp7-source/wp2
+      - name: Download WP3 independent constraint diagnostics
+        uses: actions/download-artifact@v4
+        with:
+          name: wp3-2023-constraint-attribution
+          run-id: 40150436630
+          github-token: ${{ github.token }}
+          path: wp7-source/wp3
+      - name: Download WP4 verified five-year weather synthesis
+        uses: actions/download-artifact@v4
+        with:
+          name: wp4-2021-2025-interannual-synthesis
+          run-id: 40157038537
+          github-token: ${{ github.token }}
+          path: wp7-source/wp4
+      - name: Download WP6 pyam-validated IAMC export
+        uses: actions/download-artifact@v4
+        with:
+          name: wp6-iamc-verified-exchange
+          run-id: 40190690775
+          github-token: ${{ github.token }}
+          path: wp7-source/wp6
+      - name: Recompute original WP2 hourly metrics, audit all hashes and build manuscript
+        run: |
+          python -m research.paper_wp7 \
+            --wp2 wp7-source/wp2 \
+            --wp3 wp7-source/wp3 \
+            --wp4 wp7-source/wp4 \
+            --wp6 wp7-source/wp6 \
+            --template docs/research/WP7_MANUSCRIPT_TEMPLATE.md \
+            --output wp7-manuscript
+      - name: Archive finished working paper, tables, figures and SHA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp7-source-audited-manuscript-figures
+          path: wp7-manuscript/
+          if-no-files-found: warn
+          retention-days: 60
