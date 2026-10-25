@@ -1,3 +1,5 @@
+> **Primary-source price equality now established, 2026-10-25:** The original 14 XML A44 files have been downloaded and SHA-256 checked. Independent application of official A03 block rules reconstructs all 8,760 hourly 2023 prices **exactly**, with zero disagreement against processed observed-price artifact. See [original A03 equivalence audit](WP1_2023_A03_PRIMARY_SOURCE_EQUIVALENCE.md). The raw-byte archive still needs long-term preservation and the **original CDS wind alignment remains unverified**.
+
 # WP1 primary ENTSO-E A44 XML preservation and wind calendar audit
 
 **Implemented; original-source verification is pending a live manual source run.**

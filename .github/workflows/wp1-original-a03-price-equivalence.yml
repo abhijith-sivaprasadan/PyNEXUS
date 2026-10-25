@@ -1,0 +1,52 @@
+name: WP1 NL 2023 original A03 source-price equivalence
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: wp1-a03-source-price-equivalence-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    name: Compare original ENTSO-E source XML against all 8760 processed hourly prices
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Test official A03 constant-price block semantics and DST
+        run: python -m pytest -q tests/test_research_wp1_raw_a44_exact_audit.py
+      - name: Download original source A44 XML (primary bytes)
+        uses: actions/download-artifact@v4
+        with:
+          name: wp1-nl-a44-original-provider-xml-2023
+          run-id: 40225702504
+          github-token: ${{ github.token }}
+          path: raw-nl-a44
+      - name: Download independently verified processed 2023 hourly prices
+        uses: actions/download-artifact@v4
+        with:
+          name: wp5-nl-2023-processed-a44-prices
+          run-id: 40205807892
+          github-token: ${{ github.token }}
+          path: processed-nl-a44
+      - name: Independently reconstruct and compare all original A03 hourly prices
+        run: |
+          python -m research.wp1_raw_a44_exact_audit \
+            --raw-dir raw-nl-a44 \
+            --processed-dir processed-nl-a44 \
+            --output wp1-2023-raw-a03-exact-equivalence
+      - name: Upload hashed primary-source equivalence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp1-original-a03-2023-exact-price-equivalence-report
+          path: wp1-2023-raw-a03-exact-equivalence/
+          if-no-files-found: warn
+          retention-days: 60
