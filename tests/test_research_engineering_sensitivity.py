@@ -13,10 +13,12 @@ from research.run_reference import CONFIG
 
 def fixture():
     cfg = yaml.safe_load(CONFIG.read_text())
-    data = pd.DataFrame({
-        "wind_available_mw": [0.0, 145.0, 30.0],
-        "electricity_price": [10.0, -30.0, 20.0],
-    })
+    data = pd.DataFrame(
+        {
+            "wind_available_mw": [0.0, 145.0, 30.0],
+            "electricity_price": [10.0, -30.0, 20.0],
+        }
+    )
     return cfg, data
 
 
