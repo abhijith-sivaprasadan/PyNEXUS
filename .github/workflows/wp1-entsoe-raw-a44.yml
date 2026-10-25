@@ -1,0 +1,43 @@
+name: WP1 original NL 2023 A44 XML evidence archive
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wp1-raw-entsoe-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  source:
+    name: Retrieve and hash original official A44 market-document XML
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[data,dev]'
+      - name: Verify raw XML parser and secret redaction without network
+        run: python -m pytest -q tests/test_research_wp1_raw_a44_archive.py
+      - name: Fail if ENTSO-E token not configured
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: |
+          if [ -z "$ENTSOE_API_KEY" ]; then
+            echo "::error::ENTSOE_API_KEY secret unavailable."
+            exit 1
+          fi
+      - name: Retrieve 14 original A44 XML monthly documents and hash each one
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: python -m research.wp1_raw_a44_archive --output raw-nl-a44-2023
+      - name: Preserve original XML, manifest, curve and resolution metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp1-nl-a44-original-provider-xml-2023
+          path: raw-nl-a44-2023/
+          retention-days: 60
+          if-no-files-found: warn
