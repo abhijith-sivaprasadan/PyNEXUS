@@ -279,9 +279,7 @@ def test_combined_all_intervention_is_one_registered_case():
     from research.interventions import registered_cases
 
     choices = registered_cases(["W", "E", "G", "S", "eta"])
-    assert select_market_cases(choices, "all") == [
-        ("all", ("W", "E", "G", "S", "eta"))
-    ]
+    assert select_market_cases(choices, "all") == [("all", ("W", "E", "G", "S", "eta"))]
     assert select_market_cases(choices, "all-cases") == choices
     assert len(select_market_cases(choices, "all-cases")) == 17
     with pytest.raises(ValueError, match="Unregistered scenario"):
