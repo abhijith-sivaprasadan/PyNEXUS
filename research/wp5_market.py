@@ -334,6 +334,19 @@ def fetch_official_snapshot(output, *, diagnostics_dir=None):
     return write_snapshot(output, series, metadata=metadata)
 
 
+def select_market_cases(choices, scenario):
+    """Preserve the registered 'all' combined intervention as one case.
+
+    The explicit 'all-cases' token is the only batch-mode selector.
+    """
+    if scenario == "all-cases":
+        return choices
+    selected = [item for item in choices if item[0] == scenario]
+    if len(selected) != 1:
+        raise ValueError(f"Unregistered scenario: {scenario!r}")
+    return selected
+
+
 def run_market_case(snapshot, output, *, scenario="baseline", hours=8760, time_limit=600):
     """Re-solve Stage A + Stage B from original wind, using observed-price input.
 
@@ -347,9 +360,7 @@ def run_market_case(snapshot, output, *, scenario="baseline", hours=8760, time_l
     prices, price_manifest = load_snapshot(snapshot)
     protocol = yaml.safe_load(PROTOCOL.read_text(encoding="utf-8"))
     choices = registered_cases(protocol["order"])
-    selected = choices if scenario == "all" else [x for x in choices if x[0] == scenario]
-    if not selected:
-        raise ValueError("Unregistered scenario")
+    selected = select_market_cases(choices, scenario)
     wind_data, base_cfg, verified_mode = source_inputs(protocol, hours=hours)
     if base_cfg["simulation"]["start_date"] != "2023-01-01":
         raise ValueError("Original wind data start date does not match UTC price year")
@@ -431,7 +442,7 @@ def main(argv=None):
     fetch = subs.add_parser("fetch", help="Fetch NL 2023 A44 using ENTSOE_API_KEY")
     fetch.add_argument("--output", type=Path, required=True)
     fetch.add_argument("--diagnostics-dir", type=Path)
-    run = subs.add_parser("dispatch", help="Re-solve one or all registered cases")
+    run = subs.add_parser("dispatch", help="Re-solve one case, or all with --scenario all-cases")
     run.add_argument("--snapshot", type=Path, required=True)
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--scenario", default="baseline")

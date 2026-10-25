@@ -1,0 +1,65 @@
+name: WP5 recover 2023 observed-price 17-case synthesis
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wp5-recover-observed-matrix.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: wp5-recover-observed-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  synthesis:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - name: Retrieve all 17 successful annual results from original run (read only)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wp5-observed-full-year-*
+          run-id: 40229852457
+          github-token: ${{ github.token }}
+          path: wp5-annual-artifacts
+      - name: Verify every 8760-hour source dispatch and reconstruct signed synthesis
+        run: |
+          python -m research.batch_evidence wp5 \
+            --input wp5-annual-artifacts --output wp5-observed-recovered
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          audit = json.loads(Path("wp5-observed-recovered/audit.json").read_text())
+          assert audit["scenario_count"] == 17
+          assert audit["hours_per_case"] == 8760
+          assert [r["source_artifact_case_packaging"] for r in audit["records"]].count(
+              "HISTORIC_17_IN_1_ARCHIVE_COMBINED_CASE_ONLY"
+          ) == 1
+          provenance = {
+              "source_run": "https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40229852457",
+              "source_run_id": 40229852457,
+              "original_annual_case_job_successes": 17,
+              "original_all_case_artifact_contains_17_records": True,
+              "combined_intervention_results_reused_without_resolving_or_modifying_source": True,
+              "source_input_hour_alignment_independently_verified": False,
+              "total_cost_frontier_established": False,
+          }
+          Path("wp5-observed-recovered/RECOVERY_PROVENANCE.json").write_text(
+              json.dumps(provenance, sort_keys=True, indent=2) + "\n"
+          )
+          PY
+      - name: Preserve evidence-bound synthesis and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp5-observed-2023-verified-17-case-recovered
+          path: wp5-observed-recovered/
+          if-no-files-found: error
+          retention-days: 90

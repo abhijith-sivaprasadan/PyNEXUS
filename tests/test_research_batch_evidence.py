@@ -70,3 +70,38 @@ def test_cross_case_price_hash_mismatch_rejects_all_wp5_results(tmp_path, monkey
     monkeypatch.setattr(batch_evidence, "verify_wp5", validated)
     with pytest.raises(ValueError, match="different base sources"):
         batch_evidence.generate("wp5", root, tmp_path / "summary")
+
+
+def test_wp5_manifest_reuses_historical_all_case_only_if_exact_and_verified():
+    names = batch_evidence.expected_names("wp5")
+    rec = {"scenario": "all", "status": "VERIFIED_TWO_STAGE_SOLVE"}
+    cases = [{"scenario": name, "status": "VERIFIED_TWO_STAGE_SOLVE"} for name in names]
+    manifest = {"cases": cases}
+    assert (
+        batch_evidence._wp5_manifest_case_mode(manifest, "all", rec)
+        == "HISTORIC_17_IN_1_ARCHIVE_COMBINED_CASE_ONLY"
+    )
+    assert batch_evidence._wp5_manifest_case_mode(manifest, "baseline", rec) is None
+    assert batch_evidence._wp5_manifest_case_mode({"cases": cases[:-1]}, "all", rec) is None
+    flipped = list(cases)
+    flipped[1], flipped[2] = flipped[2], flipped[1]
+    assert batch_evidence._wp5_manifest_case_mode({"cases": flipped}, "all", rec) is None
+    not_verified = [dict(case) for case in cases]
+    not_verified[1]["status"] = "INCOMPLETE"
+    assert batch_evidence._wp5_manifest_case_mode({"cases": not_verified}, "all", rec) is None
+    tampered = dict(rec, status="INCOMPLETE")
+    assert batch_evidence._wp5_manifest_case_mode(manifest, "all", tampered) is None
+
+
+def test_wp5_manifest_single_case_rejects_wrong_embedded_record():
+    rec = {"scenario": "E", "status": "VERIFIED_TWO_STAGE_SOLVE"}
+    assert (
+        batch_evidence._wp5_manifest_case_mode({"cases": [rec]}, "E", rec) == "ONE_REGISTERED_CASE"
+    )
+    assert batch_evidence._wp5_manifest_case_mode({"cases": [rec]}, "S", rec) is None
+    assert (
+        batch_evidence._wp5_manifest_case_mode(
+            {"cases": [rec]}, "E", {**rec, "status": "INCOMPLETE"}
+        )
+        is None
+    )

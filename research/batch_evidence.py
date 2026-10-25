@@ -93,6 +93,30 @@ def verify_wp4(folder, scenario):
     }
 
 
+def _wp5_manifest_case_mode(manifest, scenario, record):
+    """Accept a single registered case, or the verified legacy 17-in-1 'all' artifact.
+
+    An earlier CLI treated 'all' as batch mode. The historic artifact contains
+    all 17 completed records and dispatches. Reuse *only* its explicitly
+    registered combined-intervention case, without changing any source bytes.
+    No other overcomplete or mismatched manifest is accepted.
+    """
+    cases = manifest.get("cases")
+    if not isinstance(cases, list) or not cases or any(not isinstance(c, dict) for c in cases):
+        return None
+    if len(cases) == 1 and cases[0].get("scenario") == scenario and cases[0] == record:
+        return "ONE_REGISTERED_CASE"
+    if (
+        scenario == "all"
+        and len(cases) == 17
+        and [case.get("scenario") for case in cases] == expected_names("wp5")
+        and all(case.get("status") == "VERIFIED_TWO_STAGE_SOLVE" for case in cases)
+        and cases[-1] == record
+    ):
+        return "HISTORIC_17_IN_1_ARCHIVE_COMBINED_CASE_ONLY"
+    return None
+
+
 def verify_wp5(folder, scenario):
     base = folder / f"wp5-observed-full-year-{scenario}"
     manifest = json.loads((base / "manifest.json").read_text(encoding="utf-8"))
@@ -102,11 +126,12 @@ def verify_wp5(folder, scenario):
         or manifest["full_year"] is not True
         or manifest["year"] != 2023
         or manifest["price_csv_sha256"] != EXPECTED_PRICE_SHA
-        or len(manifest["cases"]) != 1
-        or manifest["cases"][0]["scenario"] != scenario
     ):
-        raise ValueError("Wrong, incomplete or source-mismatched WP5 run")
+        raise ValueError(f"Wrong, incomplete or source-mismatched WP5 run: {scenario}")
     rec = json.loads((base / scenario / "record.json").read_text(encoding="utf-8"))
+    case_mode = _wp5_manifest_case_mode(manifest, scenario, rec)
+    if case_mode is None:
+        raise ValueError(f"Wrong WP5 manifest case packaging: {scenario}")
     if (
         rec["status"] != "VERIFIED_TWO_STAGE_SOLVE"
         or rec["scenario"] != scenario
@@ -166,6 +191,7 @@ def verify_wp5(folder, scenario):
         "source_wind_sha256": manifest["source_wind_sha256"],
         "base_config_sha256": manifest["config_sha256"],
         "source_hour_alignment_independently_verified": False,
+        "source_artifact_case_packaging": case_mode,
         "stage_a_dispatch_sha256": rec["dispatch_hashes"]["stage_a.csv"],
         "stage_b_dispatch_sha256": rec["dispatch_hashes"]["stage_b.csv"],
     }
