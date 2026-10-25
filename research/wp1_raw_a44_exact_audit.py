@@ -18,8 +18,8 @@ from xml.etree import ElementTree as ET
 import numpy as np
 import pandas as pd
 
-from research.wp5_market import EXPECTED, PRICE_COLUMN, TIME_COLUMN, load_snapshot
 from research.wp1_raw_a44_archive import REGION, SCHEMA, months
+from research.wp5_market import EXPECTED, PRICE_COLUMN, TIME_COLUMN, load_snapshot
 
 MAX_RAW_BYTES = 12_000_000
 DOMAIN_NL = "10YNL----------L"
