@@ -72,6 +72,8 @@ def test_era5_only_utc_and_registered_site():
     assert parsed["models"] == ["era5"]
     assert parsed["timezone"] == ["GMT"]
     assert parsed["wind_speed_unit"] == ["ms"]
+    assert parsed["cell_selection"] == ["nearest"]
+    assert parsed["elevation"] == ["nan"]
     assert parsed["latitude"] == ["52.5"]
     assert parsed["longitude"] == ["3.5"]
     assert VALID_YEARS == (2021, 2022, 2023, 2024, 2025)
