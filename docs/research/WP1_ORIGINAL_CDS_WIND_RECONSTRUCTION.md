@@ -1,3 +1,15 @@
+## 2026-10-26 — Completed source-hour audit
+
+**Verified source-value equivalence; original NetCDF byte identity not recovered.** This result supersedes the historic "pending" status in this document.
+
+[GitHub Actions run 40230838449](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40230838449) re-requested 12 months of authentic CDS ERA5 NetCDF fields. All 8,760 original 2023 UTC wind-power input values were independently reconstructed with the frozen turbine model, without temporal shifting or imputation. The max and mean absolute hourly differences are 8.526512829121202e-14 and 2.9534172149379998e-15 MW. Annual original and reconstructed wind are 522096.9756187392 and 522096.97561873915 MWh.
+
+Audit status: `VERIFIED_REDELIVERED_CDS_UTC_WIND_VALUES_ORIGINAL_BYTES_DIFFER`. All **12 of 12** recovered monthly NetCDF files have new SHA-256 checksums versus the earlier source records; the original raw files are **not** byte-identical. The verified 2023 CDS wind series must not be silently substituted with the separately served WP4 Open-Meteo ERA5 data.
+
+Evidence: [UTC audit and per-month digests](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40230838449/artifacts/12653138512) and [12 monthly redelivered NetCDF files](https://github.com/abhijith-sivaprasadan/PyNEXUS/actions/runs/40230838449/artifacts/12653508461), both 60-day Actions artifacts. Preserve them in durable storage. This verifies computational source-to-power equivalence; it does not independently validate commercial turbine or wind farm measurements.
+
+---
+
 # WP1 — original 2023 ERA5 wind primary-source audit and reconstruction
 
 **Status: ready to run, NOT YET PRIMARY-VERIFIED.**

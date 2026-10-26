@@ -1,3 +1,5 @@
+> **Evidence update 26 October 2026:** Authenticated Copernicus CDS re-requests reproduced all 8,760 original 2023 UTC wind-power values with a maximum difference of 8.526512829121202e-14 MW, without time shifting or imputation. The source-value/hour alignment gate is now VERIFIED (run 40230838449). All 12 redelivered NetCDF byte hashes differ from those of the lost originals; original byte identity remains UNVERIFIED. See [completed audit](WP1_ORIGINAL_CDS_WIND_RECONSTRUCTION.md). The earlier pending discussion below is historical, not the current finding.
+
 > **Primary-source price equality now established, 2026-10-25:** The original 14 XML A44 files have been downloaded and SHA-256 checked. Independent application of official A03 block rules reconstructs all 8,760 hourly 2023 prices **exactly**, with zero disagreement against processed observed-price artifact. See [original A03 equivalence audit](WP1_2023_A03_PRIMARY_SOURCE_EQUIVALENCE.md). The raw-byte archive still needs long-term preservation and the **original CDS wind alignment remains unverified**.
 
 # WP1 primary ENTSO-E A44 XML preservation and wind calendar audit
