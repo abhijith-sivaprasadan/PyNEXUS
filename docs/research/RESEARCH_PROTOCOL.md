@@ -1,6 +1,6 @@
 # PyNEXUS — controlled technology adequacy-gaps study (protocol v1.0)
 
-**Status:** registered research plan. No new 8,760-hour intervention results exist merely because this file or the WP1 code has been committed. The historical 2023 annual outputs remain unchanged.
+**Status at initial registration:** this was a preregistered research plan; committing the plan itself did not create 8,760-hour intervention results. **Current status (26 October 2026):** the registered WP2, WP3 and WP4 computational runs and subsequent WP5 observed-price source audits have been executed and audited. The [research freeze](RESEARCH_FREEZE_2026-10-26.md) documents exactly which results are admitted, and which physical/economic sensitivity work remains incomplete. The pre-WP1 historical annual outputs remain unaltered.
 
 ## Research question and evidence boundaries
 

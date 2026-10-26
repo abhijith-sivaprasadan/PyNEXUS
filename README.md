@@ -1,12 +1,22 @@
 # PyNEXUS
 
+> **Research freeze — 26 October 2026.** PyNEXUS is frozen as an
+> independent **computational research / portfolio** evidence milestone:
+> 2023 source-reconstructed CDS wind and original-source A44 prices,
+> registered WP2/WP4/WP5 dispatches, and WP6/WP7 reproducibility.
+> This is **not** a peer-reviewed paper, plant-calibrated engineering design,
+> verified LCOH, or complete economic appraisal. No new scientific features
+> are planned under this frozen scope. Read the
+> [research freeze and exact evidence register](docs/research/RESEARCH_FREEZE_2026-10-26.md)
+> before interpreting or reproducing findings. CI remains enabled.
+>
 A reproducible Pyomo/HiGHS model coupling electricity, hydrogen, and heat: hourly dispatch of an offshore-wind, PEM-electrolyser, hydrogen-storage/pipeline, grid-connected, and heat-recovery system, under physical operating constraints and alternative cost and emissions objectives.
 
 ## Scope
 
 The checked-in reference configuration covers 168 hourly timesteps; `configs/annual.yaml` covers the full 8,760-hour year and has a real recorded run (see below). The model includes wind availability, electrolyser minimum/maximum load and ramping, a simplified hydrogen-pipeline capacity constraint, and hydrogen-demand constraints. Hydrogen storage, grid import/export, and electrolyser waste-heat recovery (with heat storage and backup boiler) are all implemented but opt-in (`optimize(enable_storage=True, enable_grid=True, enable_heat=True)`) and off by default. It is a screening model, not a project-specific engineering design.
 
-`data/era5.py` implements and unit-tests a real Copernicus Climate Data Store fetch, nearest-grid-cell extraction, hub-height shear correction, and a committed provenance record (`pynexus fetch-era5` / `fetch-era5-year`) — see [`docs/data_provenance.md`](docs/data_provenance.md). A full year of real 2023 ERA5 wind for the configured North Sea site has been fetched (chunked by month, per a real CDS request-size limit) and run through the dispatch model — see [`docs/reproducibility.md`](docs/reproducibility.md)'s 2026-09-01 section and [`docs/validation.md`](docs/validation.md) for the resulting capacity factor. `data/entsoe.py` implements and unit-tests the equivalent path for ENTSO-E day-ahead prices, but has no live fetch yet (needs a separate `ENTSOE_API_KEY`) and isn't wired into `pynexus solve` — `--wind-csv` pairs real wind with synthetic prices as an interim hybrid. Deterministic tests continue to use synthetic arrays.
+`data/era5.py` implements and unit-tests a real Copernicus Climate Data Store fetch, nearest-grid-cell extraction, hub-height shear correction, and a committed provenance record (`pynexus fetch-era5` / `fetch-era5-year`) — see [`docs/data_provenance.md`](docs/data_provenance.md). A full year of real 2023 ERA5 wind for the configured North Sea site has been fetched (chunked by month, per a real CDS request-size limit) and run through the dispatch model — see [`docs/reproducibility.md`](docs/reproducibility.md)'s 2026-09-01 section and [`docs/validation.md`](docs/validation.md) for the resulting capacity factor. `data/entsoe.py` contains the optional ENTSO-E retrieval adapter; subsequent WP1/WP5 research workflows separately acquired, source-verified and used actual 2023 Dutch A44 hourly day-ahead prices in a registered 17-case annual Stage B study. The legacy `--wind-csv` CLI demonstration still uses synthetic prices unless an explicit supported input is provided; do not mistake it for the observed-price WP5 pipeline. Deterministic component tests continue to use synthetic arrays.
 
 ## Quick start
 
